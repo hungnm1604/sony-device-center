@@ -59,6 +59,9 @@ class DeviceCenterController : public QObject {
     Q_PROPERTY(QString appVersion READ appVersion CONSTANT)
     Q_PROPERTY(QString currentLanguage READ currentLanguage WRITE setLanguage NOTIFY languageChanged)
     Q_PROPERTY(QVariantList availableLanguages READ availableLanguages CONSTANT)
+    // Colour theme id: "midnight" (default), "ice" or "amber". The palettes
+    // themselves live in Main.qml; the controller only validates and persists.
+    Q_PROPERTY(QString theme READ theme WRITE setTheme NOTIFY themeChanged)
 
 public:
     explicit DeviceCenterController(QObject* parent = nullptr, std::shared_ptr<core::IDeviceService> service = {});
@@ -106,6 +109,7 @@ public:
     [[nodiscard]] QString appVersion() const;
     [[nodiscard]] QString currentLanguage() const;
     [[nodiscard]] QVariantList availableLanguages() const;
+    [[nodiscard]] QString theme() const;
 
     Q_INVOKABLE void setAnc(bool enabled);
     Q_INVOKABLE void setAmbient(int level, bool focusOnVoice = false);
@@ -119,6 +123,7 @@ public:
 
     Q_INVOKABLE void setAutostart(bool enable);
     Q_INVOKABLE void setLanguage(const QString& langCode);
+    Q_INVOKABLE void setTheme(const QString& themeId);
     Q_INVOKABLE QString t(const QString& key) const;
     Q_INVOKABLE void openUrl(const QString& url);
 
@@ -132,6 +137,7 @@ signals:
     void pairedDevicesChanged();
     void autostartChanged();
     void languageChanged();
+    void themeChanged();
 
 private:
     void _applySnapshot(const QByteArray& data);
@@ -166,6 +172,9 @@ private:
     int _autoPowerOff{0};
     QVariantList _pairedDevices;
     QString _currentLanguage{"en"};
+    QString _theme{"midnight"};
+
+    void _applyColorScheme() const;
 
 };
 

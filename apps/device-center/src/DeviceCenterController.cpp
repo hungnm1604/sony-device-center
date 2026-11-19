@@ -14,7 +14,9 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QSettings>
+#include <QStyleHints>
 #include <QSemaphore>
 #include <QStandardPaths>
 #include <QTextStream>
@@ -25,10 +27,20 @@
 
 namespace sony::devicecenter {
 
+namespace {
+// Unknown or stale ids from older settings fall back to the original theme.
+QString normalizedTheme(const QString& id) {
+    if (id == QLatin1String("ice") || id == QLatin1String("amber")) return id;
+    return QStringLiteral("midnight");
+}
+} // namespace
+
 DeviceCenterController::DeviceCenterController(QObject* parent, std::shared_ptr<core::IDeviceService> service)
     : QObject(parent) {
     QSettings settings("SonyBridge", "SonyDeviceCenter");
     _currentLanguage = settings.value("language", "en").toString();
+    _theme = normalizedTheme(settings.value("theme", "midnight").toString());
+    _applyColorScheme();
     _backend = new DeviceBackend(std::move(service));
     _backend->moveToThread(&_worker);
     connect(&_worker, &QThread::started, _backend, &DeviceBackend::start);
@@ -248,6 +260,31 @@ void DeviceCenterController::setLanguage(const QString& langCode) {
         settings.setValue("language", langCode);
         emit languageChanged();
     }
+}
+
+QString DeviceCenterController::theme() const {
+    return _theme;
+}
+
+void DeviceCenterController::setTheme(const QString& themeId) {
+    const QString next = normalizedTheme(themeId);
+    if (_theme == next) return;
+    _theme = next;
+    QSettings settings("SonyBridge", "SonyDeviceCenter");
+    settings.setValue("theme", _theme);
+    _applyColorScheme();
+    emit themeChanged();
+}
+
+// Tell the platform whether the window chrome should be light or dark, so the
+// macOS title bar and traffic lights match the Ice theme instead of following
+// the system appearance. Requires Qt 6.8; older Qt keeps the system scheme.
+void DeviceCenterController::_applyColorScheme() const {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    if (qobject_cast<QGuiApplication*>(QCoreApplication::instance()) == nullptr) return;
+    QGuiApplication::styleHints()->setColorScheme(
+        _theme == QLatin1String("ice") ? Qt::ColorScheme::Light : Qt::ColorScheme::Dark);
+#endif
 }
 
 QString DeviceCenterController::t(const QString& key) const {
