@@ -134,6 +134,10 @@ TEST_CASE("Structured snapshots are escaped versioned and truthful", "[core][jso
     CHECK(snapshot["features"]["noiseControl"]["availability"] == "valid");
     CHECK(snapshot["codec"] == "Unknown");
     CHECK(JsonProtocol::execute({{"version",1},{"id",1},{"method","ambient"},{"params",{{"level",21}}}},service)["error"]["code"] == "InvalidRequest");
+    // The V2 Speak-to-Chat config layout is unverified, so XM5 must refuse the
+    // timeout instead of sending a guessed frame.
+    CHECK(snapshot["capabilities"]["speakToChatTimeout"] == false);
+    CHECK(JsonProtocol::execute({{"version",1},{"id",2},{"method","speakToChatTimeout"},{"params",{{"timeout",2}}}},service)["error"]["code"] == "Unsupported");
     service.disconnect();
     CHECK(JsonProtocol::snapshot(service)["features"]["noiseControl"]["availability"] == "stale");
     auto status = IpcProtocol::execute(IpcProtocol::parseCommand("status"),service);
@@ -229,3 +233,16 @@ TEST_CASE("IPC refuses insecure paths and recovers an owned stale socket", "[cor
     }
 }
 #endif
+
+TEST_CASE("Speak-to-Chat timeout is offered and range-checked only on WH-1000XM4", "[core][json][speak-to-chat]") {
+    auto transport = std::make_shared<ReplyTransport>();
+    DeviceService service(transport);
+    service.connect(DeviceAddress("11:22:33:44:55:66"), "WH-1000XM4");
+    CHECK(JsonProtocol::snapshot(service)["capabilities"]["speakToChatTimeout"] == true);
+    auto call = [&](Json params) {
+        return JsonProtocol::execute({{"version",1},{"id",1},{"method","speakToChatTimeout"},{"params",std::move(params)}}, service);
+    };
+    CHECK(call({{"timeout",4}})["error"]["code"] == "InvalidRequest");
+    CHECK(call({{"timeout",-1}})["error"]["code"] == "InvalidRequest");
+    service.disconnect();
+}

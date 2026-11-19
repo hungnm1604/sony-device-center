@@ -39,7 +39,7 @@ This document tracks hardware-level verification and protocol capability support
 - Firmware `0x04 0x02` (returns `0x05`), codec `0x18 0x00` (returns `0x19`).
 - **Opcode `0x22` is POWER OFF** — must NEVER be transmitted to a V1 device to query battery.
 - DSEE (`0xe6 0x02`) and auto power-off (`0xf6 0x04`) do answer on a WH-1000XM4 but are not decoded or exposed yet.
-- Speak-to-Chat is Smart Talking Mode: GET `0xf6 0x05` → RET `0xf7 0x05 <kind> <onOff>`, SET enable `0xf8 0x05 0x01 <0|1>`. Enable is **not** inverted. Config SET `0xfc 0x05 0x00 <sensitivity> <focus> <timeout>` is required on enable; without it an XM4 session never times out. `kind 0x02` is an active talking session, not off. Timeout bytes match Headphones Connect: `0x00` ~15s, `0x01` Standard ~30s (what we write today), `0x02` ~1 min, `0x03` do not close. Sensitivity/timeout UI is a nice-to-have.
+- Speak-to-Chat is Smart Talking Mode: GET `0xf6 0x05` → RET `0xf7 0x05 <kind> <onOff>`, SET enable `0xf8 0x05 0x01 <0|1>`. Enable is **not** inverted. Config SET `0xfc 0x05 0x00 <sensitivity> <focus> <timeout>` is required on enable; without it an XM4 session never times out. `kind 0x02` is an active talking session, not off. Timeout bytes match Headphones Connect: `0x00` ~15s, `0x01` Standard ~30s (the default), `0x02` ~1 min, `0x03` do not close. The timeout is user-selectable on WH-1000XM4 (`speakToChatTimeout` capability); the headset cannot report it, so the GUI persists the choice and re-sends it with every enable. Sensitivity stays Auto (`0x00`): the other sensitivity bytes are not documented. V2 timeout layout is unverified and not exposed.
 
 ### Protocol V2 (e.g. WH-1000XM5, WF-1000XM4/M5, LinkBuds, ULT WEAR)
 - Extended variable-length payload structures.

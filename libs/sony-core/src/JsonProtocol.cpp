@@ -30,7 +30,8 @@ Json JsonProtocol::snapshot(IDeviceService& service) {
         {"capabilities", {{"anc", c.noiseCancelling}, {"ambient", c.ambientSound}, {"focusOnVoice", c.focusOnVoice},
             {"equalizer", c.equalizer}, {"clearBass", c.clearBass}, {"tenBandEqualizer", c.tenBandEqualizer},
             {"dsee", c.dsee}, {"battery", c.battery},
-            {"speakToChat", c.speakToChat}, {"adaptiveVolume", c.adaptiveVolume}, {"autoPowerOff", c.autoPowerOff}}},
+            {"speakToChat", c.speakToChat}, {"speakToChatTimeout", c.speakToChatTimeout},
+            {"adaptiveVolume", c.adaptiveVolume}, {"autoPowerOff", c.autoPowerOff}}},
         {"features", features},
         {"battery", {{"main", optional(s->battery.main)}, {"left", optional(s->battery.left)}, {"right", optional(s->battery.right)},
             {"case", optional(s->battery.caseBattery)}, {"charging", s->battery.charging}}},
@@ -104,7 +105,16 @@ Json JsonProtocol::execute(const Json& request, IDeviceService& service) {
                     dev->setEqualizerCustom(integer(params, "clearBass", -10, 10), bands);
                 }
             } else if (method == "dsee") { supported(c.dsee); dev->setDsee(params.at("enabled").get<bool>()); }
-            else if (method == "speakToChat") { supported(c.speakToChat); dev->setSpeakToChat(params.at("enabled").get<bool>()); }
+            else if (method == "speakToChat") {
+                supported(c.speakToChat);
+                // Optional "timeout" rides along with an enable so a restarted
+                // daemon (which forgets it) still arms the user's choice. Older
+                // GUIs omit it and keep the Standard default.
+                if (c.speakToChatTimeout && params.contains("timeout"))
+                    dev->setSpeakToChatTimeout(integer(params, "timeout", 0, 3));
+                dev->setSpeakToChat(params.at("enabled").get<bool>());
+            }
+            else if (method == "speakToChatTimeout") { supported(c.speakToChatTimeout); dev->setSpeakToChatTimeout(integer(params, "timeout", 0, 3)); }
             else if (method == "adaptiveVolume") { supported(c.adaptiveVolume); dev->setAdaptiveVolume(params.at("enabled").get<bool>()); }
             else if (method == "autoPowerOff") { supported(c.autoPowerOff); dev->setAutoPowerOff(integer(params, "index", 0, 5)); }
             else throw std::invalid_argument("Unknown method: " + method);

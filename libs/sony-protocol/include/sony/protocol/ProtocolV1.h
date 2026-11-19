@@ -41,6 +41,7 @@ public:
 
     bool getSpeakToChat() override;
     void setSpeakToChat(bool enabled) override;
+    void setSpeakToChatTimeout(int timeout, bool apply) override;
 
     bool getAdaptiveVolume() override;
     void setAdaptiveVolume(bool enabled) override;
@@ -51,6 +52,9 @@ public:
 
 private:
     SonyProtocolSession& _session;
+    uint8_t _speakToChatTimeout{0x01};  // Standard ~30 s until told otherwise
+
+    void _sendSpeakToChatConfig();
 };
 
 } // namespace sony::protocol

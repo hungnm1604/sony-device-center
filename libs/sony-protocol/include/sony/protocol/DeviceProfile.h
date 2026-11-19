@@ -65,6 +65,11 @@ struct DeviceCapabilities
     bool wearSensor = false;
 
     bool multipoint = false;
+
+    // Speak-to-Chat auto-close timeout is writable. Only the V1 Smart
+    // Talking Mode config layout (FC 05 00 <sens> <focus> <timeout>) is
+    // documented; V2 keeps its device default until a capture confirms it.
+    bool speakToChatTimeout = false;
 };
 
 struct DeviceProfile

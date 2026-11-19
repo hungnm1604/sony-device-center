@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <stdexcept>
 
 // Byte layouts below match Client/CommandSerializer.cpp (the legacy client,
 // exercised on WH-1000XM3 hardware for years) and Gadgetbridge's
@@ -28,7 +29,7 @@ constexpr uint8_t kSpeakToChatSessionActive = 0x02;  // payload[2] while ducked
 constexpr uint8_t kSpeakToChatConfigSet = 0xfc;
 constexpr uint8_t kSpeakToChatSensitivityAuto = 0x00;
 constexpr uint8_t kSpeakToChatVoiceFocusOff = 0x00;
-constexpr uint8_t kSpeakToChatTimeoutStandard = 0x01;  // ~30s; 0x03 is "do not close"
+constexpr uint8_t kSpeakToChatTimeoutMax = 0x03;  // 00 ~15s, 01 Standard ~30s, 02 ~1min, 03 do not close
 
 constexpr uint8_t kEffectOff = 0x00;
 constexpr uint8_t kEffectAdjustmentCompletion = 0x11;
@@ -274,19 +275,7 @@ void ProtocolV1::setSpeakToChat(bool enabled) {
     // Connect's "do not close automatically", byte 0x03). Official app always
     // sends config (FC) with enable (F8). Config first so the timer exists
     // before the feature arms. Auto sensitivity, no voice-focus, Standard ~30s.
-    if (enabled) {
-        _session.send(SonyFrame{
-            .type = DataType::DataMdr,
-            .payload = {
-                kSpeakToChatConfigSet,
-                kSpeakToChatInquired,
-                kSpeakToChatParamConfig,
-                kSpeakToChatSensitivityAuto,
-                kSpeakToChatVoiceFocusOff,
-                kSpeakToChatTimeoutStandard
-            }
-        });
-    }
+    if (enabled) _sendSpeakToChatConfig();
     std::vector<uint8_t> payload = {
         0xf8,
         kSpeakToChatInquired,
@@ -294,6 +283,29 @@ void ProtocolV1::setSpeakToChat(bool enabled) {
         static_cast<uint8_t>(enabled ? 0x01 : 0x00)
     };
     _session.send(SonyFrame{ .type = DataType::DataMdr, .payload = std::move(payload) });
+}
+
+void ProtocolV1::setSpeakToChatTimeout(int timeout, bool apply) {
+    // Same FC config frame as enable, so only the timeout byte changes. Out of
+    // range is rejected rather than clamped: 0x03 means "never close".
+    if (timeout < 0 || timeout > kSpeakToChatTimeoutMax)
+        throw std::invalid_argument("Speak-to-Chat timeout must be 0-3");
+    _speakToChatTimeout = static_cast<uint8_t>(timeout);
+    if (apply) _sendSpeakToChatConfig();
+}
+
+void ProtocolV1::_sendSpeakToChatConfig() {
+    _session.send(SonyFrame{
+        .type = DataType::DataMdr,
+        .payload = {
+            kSpeakToChatConfigSet,
+            kSpeakToChatInquired,
+            kSpeakToChatParamConfig,
+            kSpeakToChatSensitivityAuto,
+            kSpeakToChatVoiceFocusOff,
+            _speakToChatTimeout
+        }
+    });
 }
 
 bool ProtocolV1::getAdaptiveVolume() {

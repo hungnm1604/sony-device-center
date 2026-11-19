@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SemanticTypes.h"
+#include "SonyError.h"
 #include <string>
 #include <vector>
 
@@ -41,6 +42,14 @@ public:
 
     virtual bool getSpeakToChat() = 0;
     virtual void setSpeakToChat(bool enabled) = 0;
+
+    // Speak-to-Chat auto-close timeout: 0 ~15 s, 1 Standard ~30 s, 2 ~1 min,
+    // 3 do not close. The headset cannot report it back, so the value is
+    // remembered for later enables and only written now when `apply` is set
+    // (the feature is on). Only generations with a verified layout override.
+    virtual void setSpeakToChatTimeout(int /*timeout*/, bool /*apply*/) {
+        throw SonyException(SonyErrorCode::Unsupported, "Speak-to-Chat timeout is not supported");
+    }
 
     virtual bool getAdaptiveVolume() = 0;
     virtual void setAdaptiveVolume(bool enabled) = 0;

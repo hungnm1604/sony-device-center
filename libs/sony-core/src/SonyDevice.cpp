@@ -322,6 +322,18 @@ void SonyDevice::setAutoPowerOff(int index) {
     _dispatcher.dispatch(protocol::DeviceStateChanged{snapshot()});
 }
 
+void SonyDevice::setSpeakToChatTimeout(int timeout) {
+    if (!_protocol) return;
+    bool enabled = false;
+    {
+        std::lock_guard lock(_stateMutex);
+        enabled = _state.speakToChat;
+    }
+    // Written immediately only while the feature is on; otherwise it is kept
+    // for the next enable, which sends the config frame first anyway.
+    _protocol->setSpeakToChatTimeout(timeout, enabled);
+}
+
 void SonyDevice::setSpeakToChat(bool enabled) {
     if (!_protocol) return;
     _protocol->setSpeakToChat(enabled);

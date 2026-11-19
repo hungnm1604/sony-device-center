@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <stdexcept>
 #include "sony/protocol/ProtocolV1.h"
 #include "sony/protocol/FrameCodec.h"
 #include "sony/transport/FakeTransport.h"
@@ -327,6 +328,51 @@ TEST_CASE("ProtocolV1: reads and writes Speak-to-Chat via Smart Talking Mode", "
         v1.setSpeakToChat(false);
         REQUIRE(dataRequestPayloads(fake).back() == std::vector<uint8_t>{0xf8, 0x05, 0x01, 0x00});
         REQUIRE(dataRequestPayloads(fake).size() == 3);
+    }
+
+    SECTION("Timeout while off is remembered, sent nothing, and used by the next enable")
+    {
+        ReplyingFakeTransport fake;
+        SonyProtocolSession session(&fake);
+        session.connect("11:22:33:44:55:66");
+        ProtocolV1 v1(session);
+
+        v1.setSpeakToChatTimeout(0x02, false);
+        REQUIRE(dataRequestPayloads(fake).empty());
+
+        fake.queueReply({ SonyFrame{ .type = DataType::Ack, .sequence = 0 } });
+        fake.queueReply({ SonyFrame{ .type = DataType::Ack, .sequence = 1 } });
+        v1.setSpeakToChat(true);
+        REQUIRE(dataRequestPayloads(fake) == std::vector<std::vector<uint8_t>>{
+            {0xfc, 0x05, 0x00, 0x00, 0x00, 0x02},
+            {0xf8, 0x05, 0x01, 0x01},
+        });
+    }
+
+    SECTION("Timeout while on writes only the config frame")
+    {
+        ReplyingFakeTransport fake;
+        SonyProtocolSession session(&fake);
+        session.connect("11:22:33:44:55:66");
+        ProtocolV1 v1(session);
+
+        fake.queueReply({ SonyFrame{ .type = DataType::Ack, .sequence = 0 } });
+        v1.setSpeakToChatTimeout(0x03, true);
+        REQUIRE(dataRequestPayloads(fake) == std::vector<std::vector<uint8_t>>{
+            {0xfc, 0x05, 0x00, 0x00, 0x00, 0x03},
+        });
+    }
+
+    SECTION("Out-of-range timeout is rejected before anything is sent")
+    {
+        ReplyingFakeTransport fake;
+        SonyProtocolSession session(&fake);
+        session.connect("11:22:33:44:55:66");
+        ProtocolV1 v1(session);
+
+        REQUIRE_THROWS_AS(v1.setSpeakToChatTimeout(4, true), std::invalid_argument);
+        REQUIRE_THROWS_AS(v1.setSpeakToChatTimeout(-1, true), std::invalid_argument);
+        REQUIRE(dataRequestPayloads(fake).empty());
     }
 }
 

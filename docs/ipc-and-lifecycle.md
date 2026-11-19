@@ -93,7 +93,9 @@ errors preserve `SonyErrorCode` names. No automatic retry of a failed write occu
 | `devices` | none | Discovery list with nullable paired/systemConnected hints |
 | `connect` | address, optional name | State after connection |
 | `disconnect` | none | State after explicit disconnect |
-| `anc`, `dsee`, `speakToChat`, `adaptiveVolume` | enabled: boolean | State after acknowledged write |
+| `anc`, `dsee`, `adaptiveVolume` | enabled: boolean | State after acknowledged write |
+| `speakToChat` | enabled: boolean, optional timeout: 0–3 (only with the `speakToChatTimeout` capability) | State after acknowledged write |
+| `speakToChatTimeout` | timeout: 0–3 (~15 s, ~30 s, ~1 min, never); `Unsupported` without the capability | State after the write; sent to the headset only while Speak-to-Chat is on |
 | `ambient` | level: 1–20, optional focusOnVoice | State after acknowledged write |
 | `eqPreset` | preset: supported numeric code | State after acknowledged write |
 | `eqCustom` | clearBass: −10–10, bands: five integers −10–10 | State after acknowledged write |

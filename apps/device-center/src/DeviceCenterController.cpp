@@ -40,6 +40,7 @@ DeviceCenterController::DeviceCenterController(QObject* parent, std::shared_ptr<
     QSettings settings("SonyBridge", "SonyDeviceCenter");
     _currentLanguage = settings.value("language", "en").toString();
     _theme = normalizedTheme(settings.value("theme", "midnight").toString());
+    _speakToChatTimeout = std::clamp(settings.value("speakToChatTimeout", 1).toInt(), 0, 3);
     _applyColorScheme();
     _backend = new DeviceBackend(std::move(service));
     _backend->moveToThread(&_worker);
@@ -109,6 +110,8 @@ void DeviceCenterController::_applySnapshot(const QByteArray& data) {
     _dsee = s.value("dsee").toBool(); _speakToChat = s.value("speakToChat").toBool();
     _adaptiveVolume = s.value("adaptiveVolume").toBool(); _autoPowerOff = s.value("autoPowerOff").toInt();
     _codec = _connected && valid("codec") ? s.value("codec").toString("Unknown") : "Unknown";
+    _firmware = _connected && valid("firmware") ? s.value("firmware").toString() : QString();
+    if (_firmware == QLatin1String("Unknown")) _firmware.clear();
     emit stateChanged(); emit capabilitiesChanged();
 }
 
@@ -169,6 +172,10 @@ bool DeviceCenterController::hasDsee() const { return _capabilities.value("dsee"
 
 bool DeviceCenterController::hasSpeakToChat() const { return _capabilities.value("speakToChat").toBool(); }
 
+bool DeviceCenterController::hasSpeakToChatTimeout() const { return _capabilities.value("speakToChatTimeout").toBool(); }
+int DeviceCenterController::speakToChatTimeout() const { return _speakToChatTimeout; }
+QString DeviceCenterController::firmware() const { return _firmware; }
+
 bool DeviceCenterController::hasAdaptiveVolume() const { return _capabilities.value("adaptiveVolume").toBool(); }
 
 QVariantList DeviceCenterController::pairedDevices() const { return _pairedDevices; }
@@ -185,7 +192,19 @@ void DeviceCenterController::setEqualizerCustom(int bass, const QVariantList& ba
     _send("eqCustom", {{"clearBass",bass},{"bands",QJsonArray::fromVariantList(bands)}});
 }
 void DeviceCenterController::setDsee(bool enabled) { _send("dsee", {{"enabled",enabled}}); }
-void DeviceCenterController::setSpeakToChat(bool enabled) { _send("speakToChat", {{"enabled",enabled}}); }
+void DeviceCenterController::setSpeakToChat(bool enabled) {
+    QJsonObject params{{"enabled", enabled}};
+    if (enabled && hasSpeakToChatTimeout()) params.insert("timeout", _speakToChatTimeout);
+    _send("speakToChat", params);
+}
+void DeviceCenterController::setSpeakToChatTimeout(int timeout) {
+    timeout = std::clamp(timeout, 0, 3);
+    if (timeout == _speakToChatTimeout) return;
+    _speakToChatTimeout = timeout;
+    QSettings("SonyBridge", "SonyDeviceCenter").setValue("speakToChatTimeout", timeout);
+    emit speakToChatTimeoutChanged();
+    if (_connected && hasSpeakToChatTimeout()) _send("speakToChatTimeout", {{"timeout", timeout}});
+}
 void DeviceCenterController::setAdaptiveVolume(bool enabled) { _send("adaptiveVolume", {{"enabled",enabled}}); }
 void DeviceCenterController::setAutoPowerOff(int index) { _send("autoPowerOff", {{"index",index}}); }
 void DeviceCenterController::connectDevice(const QString& address, const QString& name) { _send("connect", {{"address",address},{"name",name}}); }

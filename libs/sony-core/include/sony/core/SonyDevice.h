@@ -58,6 +58,7 @@ public:
     void setDsee(bool enabled);
     void setAutoPowerOff(int index);
     void setSpeakToChat(bool enabled);
+    void setSpeakToChatTimeout(int timeout);
     void setAdaptiveVolume(bool enabled);
 
 private:

@@ -22,6 +22,8 @@ class DeviceCenterController : public QObject {
     Q_PROPERTY(QString lastError READ lastError NOTIFY stateChanged)
     Q_PROPERTY(QString connectionState READ connectionState NOTIFY stateChanged)
     Q_PROPERTY(QString codec READ codec NOTIFY stateChanged)
+    // Empty until the headset has reported it on this connection.
+    Q_PROPERTY(QString firmware READ firmware NOTIFY stateChanged)
     Q_PROPERTY(QVariantMap featureStatus READ featureStatus NOTIFY stateChanged)
     Q_PROPERTY(QString deviceName READ deviceName NOTIFY stateChanged)
     Q_PROPERTY(QString deviceAddress READ deviceAddress NOTIFY stateChanged)
@@ -51,6 +53,10 @@ class DeviceCenterController : public QObject {
     Q_PROPERTY(bool tenBandEqualizer READ tenBandEqualizer NOTIFY capabilitiesChanged)
     Q_PROPERTY(bool hasDsee READ hasDsee NOTIFY capabilitiesChanged)
     Q_PROPERTY(bool hasSpeakToChat READ hasSpeakToChat NOTIFY capabilitiesChanged)
+    Q_PROPERTY(bool hasSpeakToChatTimeout READ hasSpeakToChatTimeout NOTIFY capabilitiesChanged)
+    // 0 ~15 s, 1 Standard ~30 s, 2 ~1 min, 3 never. Not readable from the
+    // headset, so this is the user's saved choice, re-sent on every enable.
+    Q_PROPERTY(int speakToChatTimeout READ speakToChatTimeout NOTIFY speakToChatTimeoutChanged)
     Q_PROPERTY(bool hasAdaptiveVolume READ hasAdaptiveVolume NOTIFY capabilitiesChanged)
 
     Q_PROPERTY(QVariantList pairedDevices READ pairedDevices NOTIFY pairedDevicesChanged)
@@ -101,6 +107,9 @@ public:
     [[nodiscard]] bool tenBandEqualizer() const;
     [[nodiscard]] bool hasDsee() const;
     [[nodiscard]] bool hasSpeakToChat() const;
+    [[nodiscard]] bool hasSpeakToChatTimeout() const;
+    [[nodiscard]] int speakToChatTimeout() const;
+    [[nodiscard]] QString firmware() const;
     [[nodiscard]] bool hasAdaptiveVolume() const;
 
     [[nodiscard]] QVariantList pairedDevices() const;
@@ -118,6 +127,7 @@ public:
     Q_INVOKABLE void setEqualizerCustom(int clearBass, const QVariantList& bands);
     Q_INVOKABLE void setDsee(bool enabled);
     Q_INVOKABLE void setSpeakToChat(bool enabled);
+    Q_INVOKABLE void setSpeakToChatTimeout(int timeout);
     Q_INVOKABLE void setAdaptiveVolume(bool enabled);
     Q_INVOKABLE void setAutoPowerOff(int index);
 
@@ -138,6 +148,7 @@ signals:
     void autostartChanged();
     void languageChanged();
     void themeChanged();
+    void speakToChatTimeoutChanged();
 
 private:
     void _applySnapshot(const QByteArray& data);
@@ -173,6 +184,8 @@ private:
     QVariantList _pairedDevices;
     QString _currentLanguage{"en"};
     QString _theme{"midnight"};
+    QString _firmware;
+    int _speakToChatTimeout{1};
 
     void _applyColorScheme() const;
 

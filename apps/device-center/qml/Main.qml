@@ -13,20 +13,34 @@ ApplicationWindow {
     title: "Sony Device Center — " + controller.deviceName
     color: bg
 
+    // Errors only. Connection state is in the sidebar and progress in the
+    // "Applying…" pill, so an always-on status line just repeated them.
     footer: Rectangle {
-        color: window.surface
-        Behavior on color { ColorAnimation { duration: 320 } }
-        height: statusText.implicitHeight + 24
+        visible: controller.lastError.length > 0
+        color: Qt.rgba(window.danger.r, window.danger.g, window.danger.b, 0.12)
+        height: visible ? statusText.implicitHeight + 24 : 0
+        Rectangle { width: parent.width; height: 1; color: Qt.rgba(window.danger.r, window.danger.g, window.danger.b, 0.35) }
         Text {
             id: statusText
-            anchors.fill: parent
-            anchors.margins: 12
+            anchors.left: parent.left
+            anchors.right: dismissError.left
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.leftMargin: 16
+            anchors.rightMargin: 12
             textFormat: Text.PlainText
             wrapMode: Text.Wrap
-            color: controller.lastError.length ? window.danger : window.txtDim
-            Behavior on color { ColorAnimation { duration: 320 } }
-            text: controller.lastError.length ? controller.lastError :
-                controller.busy ? "Working…" : "Connection: " + controller.connectionState
+            color: window.danger
+            font.pixelSize: 12
+            text: controller.lastError
+        }
+        PillButton {
+            id: dismissError
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            compact: true
+            text: window.tr("dismiss")
+            onClicked: controller.clearError()
         }
     }
 
@@ -64,7 +78,7 @@ ApplicationWindow {
             accent: "#7C5CFF", accentSoft: "#A78BFA", accentInk: "#A78BFA", accentAlt: "#3B82F6",
             accentFg: "#FFFFFF", knob: "#FFFFFF",
             ambientWarm: "#F2A73B", success: "#2DD4A7", danger: "#FF5A5F",
-            txt: "#F4F6FA", txtDim: "#98A1B2", txtFaint: "#5C6473",
+            txt: "#F4F6FA", txtDim: "#98A1B2", txtFaint: "#7A8394",
             shadow: "#000000", shadowStrength: 0, bloomScale: 1.0, cardRadius: 18
         },
         // Light. Ice-blue canvas, white cards on soft blue-tinted shadows,
@@ -75,7 +89,7 @@ ApplicationWindow {
             accent: "#0A6CFF", accentSoft: "#3FA8FF", accentInk: "#0A5FE0", accentAlt: "#00BFC4",
             accentFg: "#FFFFFF", knob: "#FFFFFF",
             ambientWarm: "#D97706", success: "#009C98", danger: "#E63950",
-            txt: "#14233A", txtDim: "#53647C", txtFaint: "#7788A0",
+            txt: "#14233A", txtDim: "#53647C", txtFaint: "#66778F",
             shadow: "#1E4C8F", shadowStrength: 1, bloomScale: 0.95, cardRadius: 22
         },
         // Graphite. Flat charcoal layers, amber-yellow highlights, orange as
@@ -87,7 +101,7 @@ ApplicationWindow {
             accent: "#F5C542", accentSoft: "#FFDA70", accentInk: "#F7CB52", accentAlt: "#F2703A",
             accentFg: "#1C1D20", knob: "#F4F1E8",
             ambientWarm: "#F2703A", success: "#9CCB5A", danger: "#F2545B",
-            txt: "#F3F2EE", txtDim: "#AAADB4", txtFaint: "#7D818A",
+            txt: "#F3F2EE", txtDim: "#AAADB4", txtFaint: "#9094A0",
             shadow: "#000000", shadowStrength: 0, bloomScale: 0.45, cardRadius: 14
         }
     })
@@ -166,6 +180,14 @@ ApplicationWindow {
     readonly property int   tBase:  200
     readonly property int   tSlow:  340
 
+    // macOS System Settings → Accessibility → Display → Reduce motion.
+    // Scales go flat and looping pulses stop; colour fades remain.
+    // Desktop integration (menu bar icon, global shortcut, alerts). Absent
+    // when Main.qml is loaded without main.cpp, e.g. by preview harnesses.
+    readonly property var desk: typeof desktop !== "undefined" ? desktop : null
+    readonly property bool reduceMotion: desk !== null && desk.reduceMotion
+    function motionScale(x) { return reduceMotion ? 1.0 : x }
+
     // ==========================================================
     // REUSABLE PIECES
     // ==========================================================
@@ -215,6 +237,10 @@ ApplicationWindow {
         github:     "M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22",
         heart:      "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z",
         check:      "M5 12.5l4.2 4.2L19 7.5",
+        clock:      "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 7.5V12l3 2",
+        keyboard:   "M3.5 6.5h17v11h-17z M7 10h.01 M10 10h.01 M13 10h.01 M16 10h.01 M7.5 14h9",
+        bell:       "M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z M10 20.5a2 2 0 0 0 4 0",
+        menubar:    "M3.5 5h17v14h-17z M3.5 9h17 M15 7h2",
         palette:    "M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z M7.5 11.5h.01 M10 7.5h.01 M14.5 7.5h.01 M17 11h.01",
         info:       "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 16v-4 M12 8h.01",
         externalLink: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6 M15 3h6v6 M10 14L21 3"
@@ -373,7 +399,7 @@ ApplicationWindow {
     component Eyebrow: Text {
         textFormat: Text.PlainText
         color: window.txtFaint
-        font.pixelSize: 10
+        font.pixelSize: 11
         font.bold: true
         font.letterSpacing: 1.4
         font.capitalization: Font.AllUppercase
@@ -397,7 +423,7 @@ ApplicationWindow {
         rightPadding: leftPadding
         implicitWidth: pillRow.implicitWidth + leftPadding + rightPadding
         hoverEnabled: true
-        scale: pressed ? 0.955 : (hovered ? 1.035 : 1.0)
+        scale: window.motionScale(pressed ? 0.955 : (hovered ? 1.035 : 1.0))
 
         Behavior on scale {
             NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 2.2 }
@@ -532,7 +558,7 @@ ApplicationWindow {
             color: window.knob
             border.width: 2
             border.color: window.accent
-            scale: sl.pressed ? 1.25 : (sl.hovered ? 1.12 : 1.0)
+            scale: window.motionScale(sl.pressed ? 1.25 : (sl.hovered ? 1.12 : 1.0))
             Behavior on scale {
                 NumberAnimation { duration: 180; easing.type: Easing.OutBack; easing.overshoot: 2.5 }
             }
@@ -621,7 +647,7 @@ ApplicationWindow {
                 color: window.knob
                 border.width: 2
                 border.color: window.accent
-                scale: vs.pressed ? 1.22 : (vs.hovered ? 1.1 : 1.0)
+                scale: window.motionScale(vs.pressed ? 1.22 : (vs.hovered ? 1.1 : 1.0))
                 Behavior on scale {
                     NumberAnimation { duration: 180; easing.type: Easing.OutBack; easing.overshoot: 2.5 }
                 }
@@ -633,7 +659,7 @@ ApplicationWindow {
             Layout.alignment: Qt.AlignHCenter
             text: band.label
             color: window.txtFaint
-            font.pixelSize: 10
+            font.pixelSize: 11
             font.letterSpacing: 0.6
         }
     }
@@ -656,8 +682,11 @@ ApplicationWindow {
         Accessible.role: Accessible.RadioButton
         Accessible.name: window.tr("theme_" + themeKey)
         Accessible.checked: selected
+        activeFocusOnTab: true
+        Keys.onReturnPressed: window.applyTheme(themeKey)
+        Keys.onSpacePressed: window.applyTheme(themeKey)
 
-        ToolTip.visible: swHover.hovered
+        ToolTip.visible: swHover.hovered || activeFocus
         ToolTip.delay: 600
         ToolTip.text: window.tr("theme_" + themeKey) + " — " + window.tr("theme_" + themeKey + "_desc")
 
@@ -668,7 +697,7 @@ ApplicationWindow {
             radius: 10
             color: "transparent"
             border.width: 2
-            border.color: sw2.selected ? window.accent
+            border.color: sw2.selected || sw2.activeFocus ? window.accent
                         : swHover.hovered ? window.lineHi : "transparent"
             Behavior on border.color { ColorAnimation { duration: window.tBase } }
         }
@@ -683,7 +712,7 @@ ApplicationWindow {
             clip: true
             border.width: 1
             border.color: sw2.t.lineHi
-            scale: swTap.pressed ? 0.95 : 1.0
+            scale: window.motionScale(swTap.pressed ? 0.95 : 1.0)
             Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack } }
 
             // Sidebar with the active nav item
@@ -750,6 +779,138 @@ ApplicationWindow {
         }
     }
 
+    // One settings row: icon tile, title and description, trailing control.
+    // `divider` draws the hairline above it, so hidden rows leave no orphan.
+    component SettingRow: ColumnLayout {
+        id: srow
+        property string glyphPath: ""
+        property string title: ""
+        property string desc: ""
+        property bool divider: false
+        default property alias trailing: slot.data
+        Layout.fillWidth: true
+        spacing: 16
+
+        Rectangle {
+            visible: srow.divider
+            Layout.fillWidth: true
+            Layout.preferredHeight: 1
+            color: window.line
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 16
+            Rectangle {
+                Layout.preferredWidth: 38
+                Layout.preferredHeight: 38
+                radius: 11
+                color: Qt.rgba(window.accent.r, window.accent.g, window.accent.b, 0.14)
+                border.width: 1
+                border.color: Qt.rgba(window.accent.r, window.accent.g, window.accent.b, 0.35)
+                Glyph { anchors.centerIn: parent; path: srow.glyphPath; size: 18; color: window.accentInk }
+            }
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 3
+                Text {
+                    textFormat: Text.PlainText
+                    Layout.fillWidth: true
+                    text: srow.title
+                    color: window.txt
+                    font.pixelSize: 14
+                    font.weight: Font.DemiBold
+                }
+                Text {
+                    textFormat: Text.PlainText
+                    Layout.fillWidth: true
+                    text: srow.desc
+                    color: window.txtDim
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                }
+            }
+            Item {
+                id: slot
+                Layout.alignment: Qt.AlignVCenter
+                implicitWidth: childrenRect.width
+                implicitHeight: childrenRect.height
+            }
+        }
+    }
+
+    // Styled ComboBox for new pickers; matches the language/power combos.
+    component NeoCombo: ComboBox {
+        id: nc
+        // Bind this, not currentIndex. ComboBox resets currentIndex when its
+        // model is replaced (a language switch rebuilds the labels) and on
+        // activation, which would silently drop a plain binding.
+        property int selectedIndex: -1
+        function rebind() { nc.currentIndex = Qt.binding(function() { return nc.selectedIndex }) }
+        currentIndex: selectedIndex
+        onModelChanged: Qt.callLater(rebind)
+        onActivated: Qt.callLater(rebind)
+        implicitHeight: 38
+        background: Rectangle {
+            radius: 11
+            color: nc.hovered ? window.surfaceHi : window.surfaceSunk
+            border.width: nc.visualFocus ? 2 : 1
+            border.color: nc.visualFocus ? window.accent : nc.hovered ? window.lineHi : window.line
+            Behavior on color { ColorAnimation { duration: window.tFast } }
+        }
+        contentItem: Text {
+            textFormat: Text.PlainText
+            leftPadding: 13
+            rightPadding: 28
+            text: nc.displayText
+            color: window.txt
+            font.pixelSize: 12
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+        indicator: Glyph {
+            x: nc.width - width - 12
+            y: nc.height / 2 - height / 2
+            size: 14
+            color: window.txtFaint
+            path: window.icons.chevron
+            rotation: nc.popup.visible ? 180 : 0
+            Behavior on rotation { NumberAnimation { duration: window.tBase } }
+        }
+        popup: Popup {
+            y: nc.height + 4
+            width: nc.width
+            implicitHeight: contentItem.implicitHeight + 12
+            padding: 6
+            background: Rectangle { radius: 12; color: window.surface; border.width: 1; border.color: window.lineHi }
+            contentItem: ListView {
+                clip: true
+                implicitHeight: contentHeight
+                model: nc.popup.visible ? nc.delegateModel : null
+                currentIndex: nc.highlightedIndex
+            }
+        }
+        delegate: ItemDelegate {
+            id: ncDel
+            required property int index
+            required property var modelData
+            width: nc.width - 12
+            implicitHeight: 34
+            highlighted: nc.highlightedIndex === index
+            background: Rectangle {
+                radius: 8
+                color: ncDel.highlighted || ncDel.hovered ? window.surfaceHi : "transparent"
+            }
+            contentItem: Text {
+                textFormat: Text.PlainText
+                text: ncDel.modelData
+                color: ncDel.index === nc.currentIndex ? window.accentInk : window.txt
+                font.pixelSize: 12
+                font.weight: ncDel.index === nc.currentIndex ? Font.DemiBold : Font.Normal
+                verticalAlignment: Text.AlignVCenter
+            }
+        }
+    }
+
     // Every view enters the same way. Consistency is the whole point.
     component ViewPage: Item {
         id: page
@@ -770,6 +931,92 @@ ApplicationWindow {
 
         onVisibleChanged: if (visible) entrance.restart()
         Component.onCompleted: if (visible) entrance.restart()
+    }
+
+    // Keyboard. "Ctrl" is ⌘ on macOS. ⌘, is the platform Preferences key.
+    Shortcut { sequences: [StandardKey.Preferences]; onActivated: window.navIndex = 5 }
+    Repeater {
+        model: 6
+        delegate: Item {
+            required property int index
+            Shortcut {
+                sequence: "Ctrl+" + (index + 1)
+                onActivated: window.navIndex = index
+            }
+        }
+    }
+
+    // Keyboard focus ring for custom controls (TapHandler items are not
+    // focusable on their own). Drawn only while the parent has active focus.
+    component FocusRing: Rectangle {
+        property real cornerRadius: 12
+        anchors.fill: parent
+        anchors.margins: -3
+        radius: cornerRadius + 3
+        color: "transparent"
+        border.width: 2
+        border.color: window.accent
+        visible: parent.activeFocus
+        z: 10
+    }
+
+    // "Applying…" pill: local feedback that a command is in flight,
+    // instead of a whole page silently ignoring clicks.
+    Rectangle {
+        id: busyPill
+        z: 900
+        visible: opacity > 0
+        opacity: controller.busy ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: window.tBase } }
+        // Bottom centre of the content column, clear of every page header.
+        x: 258 + (window.contentItem.width - 258 - width) / 2
+        y: window.contentItem.height - height - 20
+        width: busyRow.implicitWidth + 26
+        height: 30
+        radius: 15
+        color: window.surfaceHi
+        border.width: 1
+        border.color: window.lineHi
+        Accessible.role: Accessible.StatusBar
+        Accessible.name: window.tr("applying")
+        RowLayout {
+            id: busyRow
+            anchors.centerIn: parent
+            spacing: 8
+            Item {
+                Layout.preferredWidth: 14
+                Layout.preferredHeight: 14
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 7
+                    color: "transparent"
+                    border.width: 2
+                    border.color: window.line
+                }
+                Shape {
+                    anchors.fill: parent
+                    antialiasing: true
+                    RotationAnimation on rotation {
+                        running: busyPill.visible && !window.reduceMotion
+                        from: 0; to: 360; duration: 900; loops: Animation.Infinite
+                    }
+                    ShapePath {
+                        strokeColor: window.accent
+                        strokeWidth: 2
+                        fillColor: "transparent"
+                        capStyle: ShapePath.RoundCap
+                        PathAngleArc { centerX: 7; centerY: 7; radiusX: 6; radiusY: 6; startAngle: -90; sweepAngle: 100 }
+                    }
+                }
+            }
+            Text {
+                textFormat: Text.PlainText
+                text: window.tr("applying")
+                color: window.txtDim
+                font.pixelSize: 12
+                font.weight: Font.Medium
+            }
+        }
     }
 
     // Cross-fade layer for theme switches (see applyTheme). Sits above
@@ -932,7 +1179,7 @@ ApplicationWindow {
                                 weight: 2
 
                                 SequentialAnimation on opacity {
-                                    running: controller.isCharging
+                                    running: controller.isCharging && !window.reduceMotion
                                     loops: Animation.Infinite
                                     NumberAnimation { to: 0.35; duration: 900; easing.type: Easing.InOutQuad }
                                     NumberAnimation { to: 1.0; duration: 900; easing.type: Easing.InOutQuad }
@@ -971,7 +1218,7 @@ ApplicationWindow {
                                     color: controller.connected ? window.success : window.danger
 
                                     SequentialAnimation on opacity {
-                                        running: controller.connected
+                                        running: controller.connected && !window.reduceMotion
                                         loops: Animation.Infinite
                                         NumberAnimation { to: 0.3; duration: 1100; easing.type: Easing.InOutQuad }
                                         NumberAnimation { to: 1.0; duration: 1100; easing.type: Easing.InOutQuad }
@@ -1036,6 +1283,14 @@ ApplicationWindow {
                             height: 44
                             y: modelData.idx * 50
 
+                            activeFocusOnTab: true
+                            Keys.onReturnPressed: window.navIndex = navItem.modelData.idx
+                            Keys.onSpacePressed: window.navIndex = navItem.modelData.idx
+                            Accessible.role: Accessible.PageTab
+                            Accessible.name: window.tr(navItem.modelData.key)
+                            Accessible.selected: navItem.current
+                            FocusRing { cornerRadius: 12 }
+
                             Rectangle {
                                 anchors.fill: parent
                                 radius: 12
@@ -1092,23 +1347,33 @@ ApplicationWindow {
                         anchors.rightMargin: 13
                         spacing: 9
 
-                        Glyph { path: window.icons.bluetooth; size: 15; color: window.success }
+                        // Real link facts only: this used to be a fixed green
+                        // "SDK Core · IPC · RFCOMM V2" regardless of state.
+                        Glyph {
+                            path: window.icons.bluetooth; size: 15
+                            color: controller.connected ? window.success : window.txtFaint
+                        }
 
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 0
                             Text {
                                 textFormat: Text.PlainText
-                                text: "SDK Core"
+                                Layout.fillWidth: true
+                                text: "Bluetooth"
                                 color: window.txtDim
                                 font.pixelSize: 11
                                 font.weight: Font.Medium
                             }
                             Text {
                                 textFormat: Text.PlainText
-                                text: "IPC · RFCOMM V2"
+                                Layout.fillWidth: true
+                                text: controller.connected
+                                      ? (controller.codec !== "Unknown" ? controller.codec : window.tr("connected"))
+                                      : window.tr("state_" + controller.connectionState)
                                 color: window.txtFaint
-                                font.pixelSize: 10
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
                             }
                         }
 
@@ -1116,7 +1381,9 @@ ApplicationWindow {
                             Layout.preferredWidth: 7
                             Layout.preferredHeight: 7
                             radius: 3.5
-                            color: window.success
+                            color: controller.connected ? window.success
+                                 : controller.connectionState !== "disconnected" ? window.ambientWarm
+                                 : window.txtFaint
                         }
                     }
                 }
@@ -1127,7 +1394,9 @@ ApplicationWindow {
         // CONTENT
         // ------------------------------------------------------
         StackLayout {
-            enabled: !controller.busy
+            // A command in flight blocks the device pages (the controller drops
+            // overlapping commands), but Settings never talks to the headset.
+            enabled: !controller.busy || window.navIndex === 5
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: window.navIndex
@@ -1148,7 +1417,7 @@ ApplicationWindow {
 
                         ColumnLayout {
                             spacing: 5
-                            Eyebrow { text: controller.connected ? "Connected Device" : "Offline" }
+                            Eyebrow { text: controller.connected ? window.tr("connected_device") : window.tr("offline") }
                             Text {
                                 textFormat: Text.PlainText
                                 text: controller.deviceName
@@ -1160,9 +1429,9 @@ ApplicationWindow {
                             Text {
                                 textFormat: Text.PlainText
                                 visible: controller.batteryLeft >= 0 || controller.batteryRight >= 0 || controller.batteryCase >= 0
-                                text: "L " + (controller.batteryLeft >= 0 ? controller.batteryLeft + "%" : "—")
-                                    + " · R " + (controller.batteryRight >= 0 ? controller.batteryRight + "%" : "—")
-                                    + " · Case " + (controller.batteryCase >= 0 ? controller.batteryCase + "%" : "—")
+                                text: window.tr("battery_left_short") + " " + (controller.batteryLeft >= 0 ? controller.batteryLeft + "%" : "—")
+                                    + " · " + window.tr("battery_right_short") + " " + (controller.batteryRight >= 0 ? controller.batteryRight + "%" : "—")
+                                    + " · " + window.tr("battery_case") + " " + (controller.batteryCase >= 0 ? controller.batteryCase + "%" : "—")
                                 color: window.txtDim
                                 font.pixelSize: 12
                             }
@@ -1170,13 +1439,12 @@ ApplicationWindow {
 
                         Item { Layout.fillWidth: true }
 
-                        // Compact status chips
+                        // Facts shown nowhere else. Battery lives in the sidebar ring
+                        // and the mode in the hero, so neither is repeated here.
                         Repeater {
                             model: [
-                                { k: "Codec", v: controller.codec },
-                                { k: "Battery", v: controller.batteryLevel >= 0 ? controller.batteryLevel + "%" : "Unknown" },
-                                { k: "Mode", v: controller.noiseControlMode === "unknown" ? "Unknown" : controller.noiseControlMode === "cancelling" ? "ANC"
-                                              : controller.noiseControlMode === "ambient" ? "Ambient" : "Off" }
+                                { k: window.tr("codec"), v: controller.codec === "Unknown" ? "—" : controller.codec },
+                                { k: window.tr("firmware"), v: controller.firmware.length ? controller.firmware : "—" }
                             ]
 
                             delegate: Rectangle {
@@ -1261,7 +1529,7 @@ ApplicationWindow {
                                         visible: live
 
                                         SequentialAnimation {
-                                            running: auraRing.live
+                                            running: auraRing.live && !window.reduceMotion
                                             loops: Animation.Infinite
                                             PauseAnimation { duration: auraRing.index * 700 }
                                             ParallelAnimation {
@@ -1299,7 +1567,7 @@ ApplicationWindow {
                                     fillMode: Image.PreserveAspectFit
                                     source: "../" + controller.heroImagePath
                                     opacity: controller.connected ? 1.0 : 0.35
-                                    scale: heroHover.hovered ? 1.06 : 1.0
+                                    scale: window.motionScale(heroHover.hovered ? 1.06 : 1.0)
 
                                     Behavior on scale { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
                                     Behavior on opacity { NumberAnimation { duration: window.tSlow } }
@@ -1312,9 +1580,9 @@ ApplicationWindow {
                                 textFormat: Text.PlainText
                                 Layout.alignment: Qt.AlignHCenter
                                 Layout.topMargin: 10
-                                text: controller.noiseControlMode === "unknown" ? "Unknown" : controller.noiseControlMode === "cancelling" ? "Noise Cancelling"
-                                    : controller.noiseControlMode === "ambient" ? "Ambient Sound"
-                                    : "Processing Off"
+                                text: controller.noiseControlMode === "unknown" ? window.tr("unknown") : controller.noiseControlMode === "cancelling" ? window.tr("noise_cancelling")
+                                    : controller.noiseControlMode === "ambient" ? window.tr("ambient_sound")
+                                    : window.tr("processing_off")
                                 color: window.txt
                                 font.pixelSize: 18
                                 font.weight: Font.DemiBold
@@ -1325,9 +1593,9 @@ ApplicationWindow {
                                 textFormat: Text.PlainText
                                 Layout.alignment: Qt.AlignHCenter
                                 Layout.topMargin: 2
-                                text: controller.noiseControlMode === "unknown" ? "Unknown" : controller.noiseControlMode === "cancelling" ? "The outside world is sealed out"
-                                    : controller.noiseControlMode === "ambient" ? "Level " + controller.ambientLevel + " · hearing your surroundings"
-                                    : "Straight signal, no processing"
+                                text: controller.noiseControlMode === "unknown" ? window.tr("mode_unknown_desc") : controller.noiseControlMode === "cancelling" ? window.tr("nc_hero_desc")
+                                    : controller.noiseControlMode === "ambient" ? window.tr("ambient_hero_desc").arg(controller.ambientLevel)
+                                    : window.tr("off_hero_desc")
                                 color: window.txtFaint
                                 font.pixelSize: 12
                             }
@@ -1339,7 +1607,7 @@ ApplicationWindow {
                                 spacing: 11
 
                                 PillButton {
-                                    text: "Noise Cancelling"
+                                    text: window.tr("noise_cancelling")
                                     glyphPath: window.icons.shield
                                     tint: window.accent
                                     active: controller.noiseControlMode === "cancelling"
@@ -1347,7 +1615,7 @@ ApplicationWindow {
                                 }
 
                                 PillButton {
-                                    text: "Ambient"
+                                    text: window.tr("ambient_short")
                                     glyphPath: window.icons.mic
                                     tint: window.ambientWarm
                                     active: controller.noiseControlMode === "ambient"
@@ -1355,7 +1623,7 @@ ApplicationWindow {
                                 }
 
                                 PillButton {
-                                    text: "Off"
+                                    text: window.tr("noise_control_off")
                                     glyphPath: window.icons.power
                                     tint: window.txtDim
                                     active: controller.noiseControlMode === "off"
@@ -1368,7 +1636,7 @@ ApplicationWindow {
                                 Layout.alignment: Qt.AlignHCenter
                                 Layout.topMargin: 12
                                 compact: true
-                                text: "EQ · " + controller.equalizerPresetName
+                                text: window.tr("eq_short") + " · " + controller.equalizerPresetName
                                 glyphPath: window.icons.sliders
                                 onClicked: window.navIndex = 2
                             }
@@ -1388,10 +1656,10 @@ ApplicationWindow {
 
                     ColumnLayout {
                         spacing: 5
-                        Eyebrow { text: "Isolation" }
+                        Eyebrow { text: window.tr("nc_eyebrow") }
                         Text {
                             textFormat: Text.PlainText
-                            text: "Noise Control"
+                            text: window.tr("nav_noise_control")
                             color: window.txt
                             font.pixelSize: 28
                             font.weight: Font.DemiBold
@@ -1399,23 +1667,26 @@ ApplicationWindow {
                         }
                         Text {
                             textFormat: Text.PlainText
-                            text: "Choose how much of the world gets through."
+                            text: window.tr("nc_subtitle")
                             color: window.txtDim
                             font.pixelSize: 13
                         }
                     }
 
-                    // Mode cards — big targets, honest states
+                    // Mode cards — compact rows, still a large target. fillHeight is
+                    // off explicitly: layouts default to filling, which stretched
+                    // these to most of the window.
                     RowLayout {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 132
+                        Layout.preferredHeight: 84
+                        Layout.fillHeight: false
                         spacing: 14
 
                         Repeater {
                             model: [
-                                { mode: "cancelling", label: "Noise Cancelling", glyph: window.icons.shield, desc: "Seal out the room", tint: window.accent },
-                                { mode: "ambient",    label: "Ambient Sound",    glyph: window.icons.mic,    desc: "Let the room in",   tint: window.ambientWarm },
-                                { mode: "off",        label: "Off",              glyph: window.icons.power,  desc: "No processing",     tint: window.txtDim }
+                                { mode: "cancelling", label: window.tr("noise_cancelling"),  glyph: window.icons.shield, desc: window.tr("nc_card_desc"),      tint: window.accent },
+                                { mode: "ambient",    label: window.tr("ambient_sound"),     glyph: window.icons.mic,    desc: window.tr("ambient_card_desc"), tint: window.ambientWarm },
+                                { mode: "off",        label: window.tr("noise_control_off"), glyph: window.icons.power,  desc: window.tr("off_card_desc"),     tint: window.txtDim }
                             ]
 
                             delegate: Card {
@@ -1427,86 +1698,87 @@ ApplicationWindow {
                                 Layout.fillHeight: true
                                 active: current
                                 hovered: modeHover.hovered
-                                scale: modeTap.pressed ? 0.975 : (modeHover.hovered ? 1.012 : 1.0)
+                                scale: window.motionScale(modeTap.pressed ? 0.975 : (modeHover.hovered ? 1.012 : 1.0))
 
                                 Behavior on scale {
                                     NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 1.8 }
                                 }
 
                                 HoverHandler { id: modeHover; cursorShape: Qt.PointingHandCursor }
-                                TapHandler {
-                                    id: modeTap
-                                    onTapped: {
-                                        if (modeCard.modelData.mode === "cancelling") controller.setAnc(true)
-                                        else if (modeCard.modelData.mode === "ambient") controller.setAmbient(controller.ambientLevel, controller.focusOnVoice)
-                                        else controller.setNoiseControlOff()
-                                    }
+                                function choose() {
+                                    if (modeCard.modelData.mode === "cancelling") controller.setAnc(true)
+                                    else if (modeCard.modelData.mode === "ambient") controller.setAmbient(controller.ambientLevel, controller.focusOnVoice)
+                                    else controller.setNoiseControlOff()
                                 }
+                                TapHandler { id: modeTap; onTapped: modeCard.choose() }
+                                activeFocusOnTab: true
+                                Keys.onReturnPressed: modeCard.choose()
+                                Keys.onSpacePressed: modeCard.choose()
+                                Accessible.role: Accessible.RadioButton
+                                Accessible.name: modeCard.modelData.label
+                                Accessible.checked: modeCard.current
+                                FocusRing { cornerRadius: window.cardRadius }
 
-                                ColumnLayout {
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.leftMargin: 20
-                                    anchors.rightMargin: 20
-                                    spacing: 12
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 16
+                                    anchors.rightMargin: 16
+                                    spacing: 13
 
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 10
+                                    Rectangle {
+                                        Layout.preferredWidth: 42
+                                        Layout.preferredHeight: 42
+                                        radius: 13
+                                        color: modeCard.current
+                                             ? Qt.rgba(modeCard.modelData.tint.r, modeCard.modelData.tint.g, modeCard.modelData.tint.b, 0.18)
+                                             : window.surfaceSunk
+                                        border.width: 1
+                                        border.color: modeCard.current
+                                             ? Qt.rgba(modeCard.modelData.tint.r, modeCard.modelData.tint.g, modeCard.modelData.tint.b, 0.5)
+                                             : window.line
+                                        Behavior on color { ColorAnimation { duration: window.tBase } }
+                                        Behavior on border.color { ColorAnimation { duration: window.tBase } }
 
-                                        Rectangle {
-                                            Layout.preferredWidth: 42
-                                            Layout.preferredHeight: 42
-                                            radius: 13
-                                            color: modeCard.current
-                                                 ? Qt.rgba(modeCard.modelData.tint.r, modeCard.modelData.tint.g, modeCard.modelData.tint.b, 0.18)
-                                                 : window.surfaceSunk
-                                            border.width: 1
-                                            border.color: modeCard.current
-                                                 ? Qt.rgba(modeCard.modelData.tint.r, modeCard.modelData.tint.g, modeCard.modelData.tint.b, 0.5)
-                                                 : window.line
-                                            Behavior on color { ColorAnimation { duration: window.tBase } }
-                                            Behavior on border.color { ColorAnimation { duration: window.tBase } }
-
-                                            Glyph {
-                                                anchors.centerIn: parent
-                                                path: modeCard.modelData.glyph
-                                                size: 21
-                                                color: modeCard.current ? modeCard.modelData.tint : window.txtFaint
-                                            }
-                                        }
-
-                                        Item { Layout.fillWidth: true }
-
-                                        // Active dot, animated in
-                                        Rectangle {
-                                            Layout.preferredWidth: 9
-                                            Layout.preferredHeight: 9
-                                            radius: 4.5
-                                            color: modeCard.modelData.tint
-                                            opacity: modeCard.current ? 1 : 0
-                                            scale: modeCard.current ? 1 : 0.4
-                                            Behavior on opacity { NumberAnimation { duration: window.tBase } }
-                                            Behavior on scale { NumberAnimation { duration: 280; easing.type: Easing.OutBack; easing.overshoot: 3 } }
+                                        Glyph {
+                                            anchors.centerIn: parent
+                                            path: modeCard.modelData.glyph
+                                            size: 21
+                                            color: modeCard.current ? modeCard.modelData.tint : window.txtFaint
                                         }
                                     }
 
                                     ColumnLayout {
+                                        Layout.fillWidth: true
                                         spacing: 2
                                         Text {
                                             textFormat: Text.PlainText
+                                            Layout.fillWidth: true
                                             text: modeCard.modelData.label
                                             color: window.txt
-                                            font.pixelSize: 15
+                                            font.pixelSize: 14
                                             font.weight: Font.DemiBold
+                                            elide: Text.ElideRight
                                         }
                                         Text {
                                             textFormat: Text.PlainText
+                                            Layout.fillWidth: true
                                             text: modeCard.modelData.desc
                                             color: window.txtFaint
                                             font.pixelSize: 12
+                                            elide: Text.ElideRight
                                         }
+                                    }
+
+                                    // Active dot, animated in
+                                    Rectangle {
+                                        Layout.preferredWidth: 9
+                                        Layout.preferredHeight: 9
+                                        radius: 4.5
+                                        color: modeCard.modelData.tint
+                                        opacity: modeCard.current ? 1 : 0
+                                        scale: modeCard.current ? 1 : 0.4
+                                        Behavior on opacity { NumberAnimation { duration: window.tBase } }
+                                        Behavior on scale { NumberAnimation { duration: 280; easing.type: Easing.OutBack; easing.overshoot: 3 } }
                                     }
                                 }
                             }
@@ -1514,13 +1786,15 @@ ApplicationWindow {
                     }
 
                     // Ambient detail
+                    // Shown only while Ambient is the live mode: a dimmed slider that
+                    // does nothing was a control without an effect.
                     Card {
                         id: ambientCard
                         Layout.fillWidth: true
                         Layout.preferredHeight: 178
                         readonly property bool live: controller.noiseControlMode === "ambient"
-                        opacity: live ? 1.0 : 0.42
-                        enabled: live
+                        visible: live
+                        opacity: live ? 1.0 : 0.0
                         Behavior on opacity { NumberAnimation { duration: window.tSlow; easing.type: Easing.OutQuad } }
 
                         ColumnLayout {
@@ -1532,10 +1806,10 @@ ApplicationWindow {
                                 Layout.fillWidth: true
                                 ColumnLayout {
                                     spacing: 2
-                                    Eyebrow { text: "Ambient" }
+                                    Eyebrow { text: window.tr("ambient_sound") }
                                     Text {
                                         textFormat: Text.PlainText
-                                        text: "Sound Level"
+                                        text: window.tr("ambient_level")
                                         color: window.txt
                                         font.pixelSize: 15
                                         font.weight: Font.DemiBold
@@ -1576,14 +1850,14 @@ ApplicationWindow {
                                     spacing: 2
                                     Text {
                                         textFormat: Text.PlainText
-                                        text: "Focus on Voice"
+                                        text: window.tr("focus_on_voice")
                                         color: window.txt
                                         font.pixelSize: 13
                                         font.weight: Font.Medium
                                     }
                                     Text {
                                         textFormat: Text.PlainText
-                                        text: "Lift human speech, filter the low rumble"
+                                        text: window.tr("focus_on_voice_desc")
                                         color: window.txtFaint
                                         font.pixelSize: 11
                                     }
@@ -1612,10 +1886,10 @@ ApplicationWindow {
 
                     ColumnLayout {
                         spacing: 5
-                        Eyebrow { text: "Signature" }
+                        Eyebrow { text: window.tr("eq_eyebrow") }
                         Text {
                             textFormat: Text.PlainText
-                            text: "Equalizer"
+                            text: window.tr("nav_equalizer")
                             color: window.txt
                             font.pixelSize: 28
                             font.weight: Font.DemiBold
@@ -1623,8 +1897,8 @@ ApplicationWindow {
                         }
                         Text {
                             textFormat: Text.PlainText
-                            text: controller.tenBandEqualizer ? "Ten bands, fine-grained."
-                                  : "Five bands, plus dedicated Clear Bass."
+                            text: controller.tenBandEqualizer ? window.tr("eq_subtitle_10")
+                                  : window.tr("eq_subtitle_5")
                             color: window.txtDim
                             font.pixelSize: 13
                         }
@@ -1669,13 +1943,20 @@ ApplicationWindow {
                                 Behavior on color { ColorAnimation { duration: window.tFast } }
                                 Behavior on border.color { ColorAnimation { duration: window.tFast } }
 
-                                scale: chipTap.pressed ? 0.94 : (chipHover.hovered ? 1.04 : 1.0)
+                                scale: window.motionScale(chipTap.pressed ? 0.94 : (chipHover.hovered ? 1.04 : 1.0))
                                 Behavior on scale {
                                     NumberAnimation { duration: 200; easing.type: Easing.OutBack; easing.overshoot: 2.4 }
                                 }
 
                                 HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
                                 TapHandler { id: chipTap; onTapped: controller.setEqualizerPreset(chip.modelData.id) }
+                                activeFocusOnTab: true
+                                Keys.onReturnPressed: controller.setEqualizerPreset(chip.modelData.id)
+                                Keys.onSpacePressed: controller.setEqualizerPreset(chip.modelData.id)
+                                Accessible.role: Accessible.RadioButton
+                                Accessible.name: chip.modelData.name
+                                Accessible.checked: chip.current
+                                FocusRing { cornerRadius: 19 }
 
                                 Text {
                                     textFormat: Text.PlainText
@@ -1703,7 +1984,7 @@ ApplicationWindow {
 
                             RowLayout {
                                 Layout.fillWidth: true
-                                Eyebrow { text: controller.tenBandEqualizer ? "10-Band" : "5-Band · ±10 dB" }
+                                Eyebrow { text: controller.tenBandEqualizer ? window.tr("eq_bands_10") : window.tr("eq_bands_5") }
                                 Item { Layout.fillWidth: true }
                                 Text {
                                     textFormat: Text.PlainText
@@ -1790,14 +2071,14 @@ ApplicationWindow {
                                 spacing: 2
                                 Text {
                                     textFormat: Text.PlainText
-                                    text: "Clear Bass"
+                                    text: window.tr("clear_bass")
                                     color: window.txt
                                     font.pixelSize: 15
                                     font.weight: Font.DemiBold
                                 }
                                 Text {
                                     textFormat: Text.PlainText
-                                    text: "Sub-bass weight, no distortion"
+                                    text: window.tr("clear_bass_desc")
                                     color: window.txtFaint
                                     font.pixelSize: 11
                                 }
@@ -1842,10 +2123,10 @@ ApplicationWindow {
 
                     ColumnLayout {
                         spacing: 5
-                        Eyebrow { text: "Behaviour" }
+                        Eyebrow { text: window.tr("feat_eyebrow") }
                         Text {
                             textFormat: Text.PlainText
-                            text: "Sound & Device Features"
+                            text: window.tr("feat_title")
                             color: window.txt
                             font.pixelSize: 28
                             font.weight: Font.DemiBold
@@ -1853,7 +2134,7 @@ ApplicationWindow {
                         }
                         Text {
                             textFormat: Text.PlainText
-                            text: "Upscaling, speak-to-chat, and power discipline."
+                            text: window.tr("feat_subtitle")
                             color: window.txtDim
                             font.pixelSize: 13
                         }
@@ -1867,9 +2148,9 @@ ApplicationWindow {
 
                         Repeater {
                             model: [
-                                { key: "dsee",     title: "DSEE Extreme",    desc: "AI restores the highs that compression threw away", glyph: window.icons.sparkle },
-                                { key: "speak",    title: "Speak-to-Chat",   desc: "Pauses playback and opens ambient when you talk",   glyph: window.icons.mic },
-                                { key: "adaptive", title: "Adaptive Volume", desc: "Balances level against your surroundings",          glyph: window.icons.sliders }
+                                { key: "dsee",     title: "DSEE Extreme",    desc: window.tr("dsee_desc"),     glyph: window.icons.sparkle },
+                                { key: "speak",    title: "Speak-to-Chat",   desc: window.tr("s2c_desc"),      glyph: window.icons.mic },
+                                { key: "adaptive", title: "Adaptive Volume", desc: window.tr("adaptive_desc"), glyph: window.icons.sliders }
                             ]
 
                             delegate: Card {
@@ -1919,6 +2200,8 @@ ApplicationWindow {
                                         spacing: 3
                                         Text {
                                             textFormat: Text.PlainText
+                                            Layout.fillWidth: true
+                                            elide: Text.ElideRight
                                             text: featCard.modelData.title
                                             color: window.txt
                                             font.pixelSize: 15
@@ -1927,7 +2210,7 @@ ApplicationWindow {
                                         Text {
                                             textFormat: Text.PlainText
                                             Layout.fillWidth: true
-                                            text: !featCard.supported ? "Not supported" : !featCard.known ? "State unknown — waiting for device" : featCard.modelData.desc
+                                            text: !featCard.supported ? window.tr("not_supported") : !featCard.known ? window.tr("state_waiting") : featCard.modelData.desc
                                             color: window.txtFaint
                                             font.pixelSize: 11
                                             wrapMode: Text.WordWrap
@@ -1979,7 +2262,9 @@ ApplicationWindow {
                                     spacing: 3
                                     Text {
                                         textFormat: Text.PlainText
-                                        text: "Auto Power-Off"
+                                        Layout.fillWidth: true
+                                        elide: Text.ElideRight
+                                        text: window.tr("auto_power_off")
                                         color: window.txt
                                         font.pixelSize: 15
                                         font.weight: Font.DemiBold
@@ -1987,7 +2272,7 @@ ApplicationWindow {
                                     Text {
                                         textFormat: Text.PlainText
                                         Layout.fillWidth: true
-                                        text: "Shut down after idle or removal"
+                                        text: window.tr("auto_power_off_desc")
                                         color: window.txtFaint
                                         font.pixelSize: 11
                                         wrapMode: Text.WordWrap
@@ -1998,7 +2283,7 @@ ApplicationWindow {
                                     id: powerCombo
                                     implicitWidth: 134
                                     implicitHeight: 38
-                                    model: ["Off", "5 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "3 Hours"]
+                                    model: [window.tr("apo_off"), window.tr("apo_5m"), window.tr("apo_15m"), window.tr("apo_30m"), window.tr("apo_1h"), window.tr("apo_3h")]
                                     currentIndex: controller.featureStatus.autoPowerOff && controller.featureStatus.autoPowerOff.availability === "valid" ? controller.autoPowerOff : -1
                                     Connections {
                                         target: controller
@@ -2039,6 +2324,70 @@ ApplicationWindow {
                                 }
                             }
                         }
+
+                        // Speak-to-Chat auto-close. Only on models whose config
+                        // frame is verified (WH-1000XM4); the headset cannot report
+                        // it, so this shows the saved choice, re-sent on enable.
+                        Card {
+                            visible: controller.hasSpeakToChatTimeout
+                            Layout.fillWidth: true
+                            Layout.columnSpan: 2
+                            Layout.preferredHeight: 112
+                            enabled: controller.connected
+                            hovered: s2cHover.hovered
+                            HoverHandler { id: s2cHover }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 20
+                                anchors.rightMargin: 20
+                                spacing: 15
+
+                                Rectangle {
+                                    Layout.preferredWidth: 44
+                                    Layout.preferredHeight: 44
+                                    radius: 14
+                                    color: window.surfaceSunk
+                                    border.width: 1
+                                    border.color: window.line
+                                    Glyph {
+                                        anchors.centerIn: parent
+                                        path: window.icons.clock
+                                        size: 21
+                                        color: window.txtFaint
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 3
+                                    Text {
+                                        textFormat: Text.PlainText
+                                        Layout.fillWidth: true
+                                        elide: Text.ElideRight
+                                        text: window.tr("s2c_timeout")
+                                        color: window.txt
+                                        font.pixelSize: 15
+                                        font.weight: Font.DemiBold
+                                    }
+                                    Text {
+                                        textFormat: Text.PlainText
+                                        Layout.fillWidth: true
+                                        text: window.tr("s2c_timeout_desc")
+                                        color: window.txtFaint
+                                        font.pixelSize: 11
+                                        wrapMode: Text.WordWrap
+                                    }
+                                }
+
+                                NeoCombo {
+                                    implicitWidth: 134
+                                    model: [window.tr("s2c_15s"), window.tr("s2c_30s"), window.tr("s2c_1m"), window.tr("s2c_never")]
+                                    selectedIndex: controller.speakToChatTimeout
+                                    onActivated: function(index) { controller.setSpeakToChatTimeout(index) }
+                                }
+                            }
+                        }
                     }
 
                     Item { Layout.fillHeight: true }
@@ -2056,10 +2405,10 @@ ApplicationWindow {
 
                     ColumnLayout {
                         spacing: 5
-                        Eyebrow { text: "Easy Switch" }
+                        Eyebrow { text: window.tr("switcher_eyebrow") }
                         Text {
                             textFormat: Text.PlainText
-                            text: "Paired Devices"
+                            text: window.tr("switcher_title")
                             color: window.txt
                             font.pixelSize: 28
                             font.weight: Font.DemiBold
@@ -2067,7 +2416,7 @@ ApplicationWindow {
                         }
                         Text {
                             textFormat: Text.PlainText
-                            text: "Hand the connection to another set without re-pairing."
+                            text: window.tr("switcher_subtitle")
                             color: window.txtDim
                             font.pixelSize: 13
                         }
@@ -2089,7 +2438,7 @@ ApplicationWindow {
                                 Layout.preferredHeight: 84
                                 active: current
                                 hovered: devHover.hovered
-                                scale: (devHover.hovered && !current) ? 1.006 : 1.0
+                                scale: window.motionScale((devHover.hovered && !current) ? 1.006 : 1.0)
                                 Behavior on scale { NumberAnimation { duration: window.tBase } }
 
                                 HoverHandler { id: devHover }
@@ -2502,6 +2851,57 @@ ApplicationWindow {
                         }
                     }
 
+                    // Card 2: Menu bar & shortcuts — everything outside the window.
+                    Card {
+                        visible: window.desk !== null && (window.desk.trayAvailable || window.desk.globalShortcutAvailable)
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: deskCol.implicitHeight + 44
+
+                        ColumnLayout {
+                            id: deskCol
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 22
+                            spacing: 16
+
+                            SettingRow {
+                                visible: window.desk !== null && window.desk.trayAvailable
+                                glyphPath: window.icons.menubar
+                                title: window.tr("menubar_icon")
+                                desc: window.tr("menubar_icon_desc")
+                                NeoSwitch {
+                                    confirmedChecked: window.desk !== null && window.desk.menuBarIcon
+                                    onToggled: window.desk.setMenuBarIcon(checked)
+                                }
+                            }
+                            SettingRow {
+                                visible: window.desk !== null && window.desk.globalShortcutAvailable
+                                divider: window.desk !== null && window.desk.trayAvailable
+                                glyphPath: window.icons.keyboard
+                                title: window.tr("global_shortcut") + (window.desk ? "  " + window.desk.globalShortcutLabel : "")
+                                desc: window.tr("global_shortcut_desc")
+                                NeoSwitch {
+                                    confirmedChecked: window.desk !== null && window.desk.globalShortcut
+                                    onToggled: window.desk.setGlobalShortcut(checked)
+                                }
+                            }
+                            SettingRow {
+                                visible: window.desk !== null && window.desk.trayAvailable
+                                divider: true
+                                glyphPath: window.icons.bell
+                                title: window.tr("battery_alerts")
+                                desc: window.tr("battery_alerts_desc")
+                                enabled: window.desk !== null && window.desk.menuBarIcon
+                                opacity: enabled ? 1 : 0.5
+                                NeoSwitch {
+                                    confirmedChecked: window.desk !== null && window.desk.batteryAlerts
+                                    onToggled: window.desk.setBatteryAlerts(checked)
+                                }
+                            }
+                        }
+                    }
+
                     // Split Cards: About Application & Community/Donate
                     RowLayout {
                         Layout.fillWidth: true
@@ -2574,7 +2974,7 @@ ApplicationWindow {
 
                                     ColumnLayout {
                                         spacing: 2
-                                        Eyebrow { text: "Protocol Core" }
+                                        Eyebrow { text: window.tr("about_protocol") }
                                         Text {
                                             textFormat: Text.PlainText
                                             text: "MDR V1 & V2 (C++20)"
@@ -2586,7 +2986,7 @@ ApplicationWindow {
 
                                     ColumnLayout {
                                         spacing: 2
-                                        Eyebrow { text: "Framework" }
+                                        Eyebrow { text: window.tr("about_framework") }
                                         Text {
                                             textFormat: Text.PlainText
                                             text: "Qt 6 Quick / QML"
@@ -2598,10 +2998,10 @@ ApplicationWindow {
 
                                     ColumnLayout {
                                         spacing: 2
-                                        Eyebrow { text: "License" }
+                                        Eyebrow { text: window.tr("about_license") }
                                         Text {
                                             textFormat: Text.PlainText
-                                            text: "MIT Open Source"
+                                            text: window.tr("about_license_value")
                                             color: window.txt
                                             font.pixelSize: 12
                                             font.weight: Font.Medium
@@ -2651,7 +3051,7 @@ ApplicationWindow {
                                         }
                                         Text {
                                             textFormat: Text.PlainText
-                                            text: "GitHub & Sponsorship"
+                                            text: window.tr("links_support_sub")
                                             color: window.txtDim
                                             font.pixelSize: 12
                                         }
