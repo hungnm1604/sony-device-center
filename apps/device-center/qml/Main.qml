@@ -15,6 +15,7 @@ ApplicationWindow {
 
     footer: Rectangle {
         color: window.surface
+        Behavior on color { ColorAnimation { duration: 320 } }
         height: statusText.implicitHeight + 24
         Text {
             id: statusText
@@ -23,6 +24,7 @@ ApplicationWindow {
             textFormat: Text.PlainText
             wrapMode: Text.Wrap
             color: controller.lastError.length ? window.danger : window.txtDim
+            Behavior on color { ColorAnimation { duration: 320 } }
             text: controller.lastError.length ? controller.lastError :
                 controller.busy ? "Working…" : "Connection: " + controller.connectionState
         }
@@ -39,23 +41,112 @@ ApplicationWindow {
     // ==========================================================
     // DESIGN TOKENS
     // Every color in this file comes from here. No orphan hex.
+    //
+    // Three palettes share one set of token names; the controller only
+    // persists the chosen id. Tuned for a Liquid Retina XDR panel:
+    // no pure #000 behind bright text (mini-LED haloing), hairlines
+    // that stay 1pt at 2x, and sRGB values macOS colour-manages to P3.
+    //
+    //   accent      fills, gradients' deep end, active borders
+    //   accentSoft  gradients' light end
+    //   accentInk   accent used as text or glyph on surfaces
+    //   accentAlt   second atmospheric bloom
+    //   accentFg    marks drawn on top of an accent fill (not "onAccent":
+    //               QML reads on<Upper> names as signal handlers)
+    //   knob        slider and switch handles
+    //   cardFade    bottom stop of the card's light-source gradient
     // ==========================================================
-    readonly property color bg:            "#0A0B0F"
-    readonly property color surface:       "#14161E"
-    readonly property color surfaceHi:     "#1B1E29"
-    readonly property color surfaceSunk:   "#0E1016"
-    readonly property color line:          "#22252F"
-    readonly property color lineHi:        "#2F3341"
+    readonly property var themes: ({
+        // Original look. Values unchanged from the single-theme build.
+        midnight: {
+            bg: "#0A0B0F", surface: "#14161E", surfaceHi: "#1B1E29", surfaceSunk: "#0E1016",
+            cardFade: "#0E1016", line: "#22252F", lineHi: "#2F3341", sidebar: "#B80D0E13",
+            accent: "#7C5CFF", accentSoft: "#A78BFA", accentInk: "#A78BFA", accentAlt: "#3B82F6",
+            accentFg: "#FFFFFF", knob: "#FFFFFF",
+            ambientWarm: "#F2A73B", success: "#2DD4A7", danger: "#FF5A5F",
+            txt: "#F4F6FA", txtDim: "#98A1B2", txtFaint: "#5C6473",
+            shadow: "#000000", shadowStrength: 0, bloomScale: 1.0, cardRadius: 18
+        },
+        // Light. Ice-blue canvas, white cards on soft blue-tinted shadows,
+        // electric blue → sky gradients and a teal second voice.
+        ice: {
+            bg: "#EEF3FA", surface: "#FFFFFF", surfaceHi: "#F5F9FE", surfaceSunk: "#E7EEF7",
+            cardFade: "#F7FAFE", line: "#DCE5F0", lineHi: "#C2D2E5", sidebar: "#C7FFFFFF",
+            accent: "#0A6CFF", accentSoft: "#3FA8FF", accentInk: "#0A5FE0", accentAlt: "#00BFC4",
+            accentFg: "#FFFFFF", knob: "#FFFFFF",
+            ambientWarm: "#D97706", success: "#009C98", danger: "#E63950",
+            txt: "#14233A", txtDim: "#53647C", txtFaint: "#7788A0",
+            shadow: "#1E4C8F", shadowStrength: 1, bloomScale: 0.95, cardRadius: 22
+        },
+        // Graphite. Flat charcoal layers, amber-yellow highlights, orange as
+        // the second voice. Ambient moves to orange so it never reads as the
+        // accent; marks on accent fills turn dark for contrast on yellow.
+        amber: {
+            bg: "#1C1D20", surface: "#2A2C31", surfaceHi: "#33363C", surfaceSunk: "#232428",
+            cardFade: "#26282C", line: "#383B42", lineHi: "#4A4E57", sidebar: "#D9202124",
+            accent: "#F5C542", accentSoft: "#FFDA70", accentInk: "#F7CB52", accentAlt: "#F2703A",
+            accentFg: "#1C1D20", knob: "#F4F1E8",
+            ambientWarm: "#F2703A", success: "#9CCB5A", danger: "#F2545B",
+            txt: "#F3F2EE", txtDim: "#AAADB4", txtFaint: "#7D818A",
+            shadow: "#000000", shadowStrength: 0, bloomScale: 0.45, cardRadius: 14
+        }
+    })
+    readonly property var themeOrder: ["midnight", "ice", "amber"]
+    readonly property string themeId: themes[controller.theme] ? controller.theme : "midnight"
+    readonly property var tp: themes[themeId]
 
-    readonly property color accent:        "#7C5CFF"
-    readonly property color accentSoft:    "#A78BFA"
-    readonly property color ambientWarm:   "#F2A73B"
-    readonly property color success:       "#2DD4A7"
-    readonly property color danger:        "#FF5A5F"
+    readonly property color bg:            tp.bg
+    readonly property color surface:       tp.surface
+    readonly property color surfaceHi:     tp.surfaceHi
+    readonly property color surfaceSunk:   tp.surfaceSunk
+    readonly property color cardFade:      tp.cardFade
+    readonly property color line:          tp.line
+    readonly property color lineHi:        tp.lineHi
+    readonly property color sidebar:       tp.sidebar
 
-    readonly property color txt:           "#F4F6FA"
-    readonly property color txtDim:        "#98A1B2"
-    readonly property color txtFaint:      "#5C6473"
+    readonly property color accent:        tp.accent
+    readonly property color accentSoft:    tp.accentSoft
+    readonly property color accentInk:     tp.accentInk
+    readonly property color accentAlt:     tp.accentAlt
+    readonly property color accentFg:      tp.accentFg
+    readonly property color knob:          tp.knob
+    readonly property color ambientWarm:   tp.ambientWarm
+    readonly property color success:       tp.success
+    readonly property color danger:        tp.danger
+
+    readonly property color txt:           tp.txt
+    readonly property color txtDim:        tp.txtDim
+    readonly property color txtFaint:      tp.txtFaint
+
+    readonly property color shadow:        tp.shadow
+    readonly property real  shadowStrength: tp.shadowStrength
+    readonly property real  bloomScale:    tp.bloomScale
+    readonly property real  cardRadius:    tp.cardRadius
+
+    // Palette entries are strings; Qt.lighter(_, 1) yields a color whose
+    // channels can be read. Qt.alpha() would do this but needs newer Qt.
+    function withAlpha(c, a) {
+        var k = Qt.lighter(c, 1.0)
+        return Qt.rgba(k.r, k.g, k.b, a)
+    }
+
+    // Theme switches cross-fade: freeze the current frame, swap tokens
+    // underneath, then dissolve the snapshot. One animation instead of a
+    // Behavior on every colour binding in the file.
+    function applyTheme(id) {
+        if (id === themeId || !themes[id]) return
+        // The stage, not window.contentItem: the content item is created in
+        // C++ and has no QML engine, so grabToImage refuses it.
+        var root = stage
+        var dpr = Screen.devicePixelRatio
+        var ok = root.grabToImage(function(result) {
+            themeSnapshot.source = result.url
+            themeSnapshot.opacity = 1
+            controller.setTheme(id)
+            themeFade.restart()
+        }, Qt.size(root.width * dpr, root.height * dpr))
+        if (!ok) controller.setTheme(id)
+    }
 
     // Mono face for the wordmark. Resolved against the installed families
     // rather than set through font.families: that property makes the engine
@@ -123,6 +214,8 @@ ApplicationWindow {
         globe:      "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M2 12h20 M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z",
         github:     "M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22",
         heart:      "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z",
+        check:      "M5 12.5l4.2 4.2L19 7.5",
+        palette:    "M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z M7.5 11.5h.01 M10 7.5h.01 M14.5 7.5h.01 M17 11h.01",
         info:       "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 16v-4 M12 8h.01",
         externalLink: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6 M15 3h6v6 M10 14L21 3"
     })
@@ -139,7 +232,7 @@ ApplicationWindow {
     component BrandMark: Item {
         id: brandMark
         property real size: 24
-        property color color: "#FFFFFF"
+        property color color: window.accentFg
         // One SVG unit expressed in item pixels. ShapePath.scale only
         // scales geometry, so stroke widths have to be scaled by hand
         // or the mark thickens as it shrinks.
@@ -201,7 +294,7 @@ ApplicationWindow {
         BrandMark {
             anchors.centerIn: parent
             size: brandTile.width * 0.6667
-            color: "#FFFFFF"
+            color: window.accentFg
         }
 
         // Top sheen, matching the app icon's highlight pass.
@@ -220,15 +313,35 @@ ApplicationWindow {
         id: card
         property bool active: false
         property bool hovered: false
-        radius: 18
+        radius: window.cardRadius
         border.width: 1
         border.color: active ? Qt.rgba(window.accent.r, window.accent.g, window.accent.b, 0.55)
                     : hovered ? window.lineHi : window.line
         gradient: Gradient {
             GradientStop { position: 0.0; color: card.hovered ? window.surfaceHi : window.surface }
-            GradientStop { position: 1.0; color: window.surfaceSunk }
+            GradientStop { position: 1.0; color: window.cardFade }
         }
         Behavior on border.color { ColorAnimation { duration: window.tBase } }
+
+        // Soft drop shadow for light themes: stacked translucent rounds
+        // beneath the card (negative z draws under the parent). Avoids
+        // QtQuick.Effects so distro Qt 6.4 builds keep loading this file.
+        Repeater {
+            model: window.shadowStrength > 0 ? 4 : 0
+            delegate: Rectangle {
+                required property int index
+                z: -1
+                anchors.fill: parent
+                anchors.leftMargin: -(index * 3)
+                anchors.rightMargin: -(index * 3)
+                anchors.topMargin: -(index * 2) + 2
+                anchors.bottomMargin: -(index * 4) - 4
+                radius: card.radius + index * 3
+                color: Qt.rgba(window.shadow.r, window.shadow.g, window.shadow.b,
+                               (card.hovered ? 0.05 : 0.035) * window.shadowStrength)
+                Behavior on color { ColorAnimation { duration: window.tBase } }
+            }
+        }
     }
 
     // Soft radial bloom. Atmosphere only — never carries information.
@@ -245,8 +358,8 @@ ApplicationWindow {
                 centerRadius: bloom.width / 2
                 focalX: centerX
                 focalY: centerY
-                GradientStop { position: 0.0; color: Qt.rgba(bloom.tint.r, bloom.tint.g, bloom.tint.b, bloom.strength) }
-                GradientStop { position: 0.55; color: Qt.rgba(bloom.tint.r, bloom.tint.g, bloom.tint.b, bloom.strength * 0.35) }
+                GradientStop { position: 0.0; color: Qt.rgba(bloom.tint.r, bloom.tint.g, bloom.tint.b, bloom.strength * window.bloomScale) }
+                GradientStop { position: 0.55; color: Qt.rgba(bloom.tint.r, bloom.tint.g, bloom.tint.b, bloom.strength * window.bloomScale * 0.35) }
                 GradientStop { position: 1.0; color: Qt.rgba(bloom.tint.r, bloom.tint.g, bloom.tint.b, 0.0) }
             }
             startX: 0; startY: 0
@@ -368,7 +481,7 @@ ApplicationWindow {
                 radius: 10
                 y: 4
                 x: sw.checked ? parent.width - width - 4 : 4
-                color: sw.checked ? "white" : window.txtFaint
+                color: sw.checked ? window.accentFg : window.txtFaint
                 Behavior on x { NumberAnimation { duration: 240; easing.type: Easing.OutBack; easing.overshoot: 1.4 } }
                 Behavior on color { ColorAnimation { duration: window.tBase } }
             }
@@ -416,7 +529,7 @@ ApplicationWindow {
             width: 18
             height: 18
             radius: 9
-            color: "white"
+            color: window.knob
             border.width: 2
             border.color: window.accent
             scale: sl.pressed ? 1.25 : (sl.hovered ? 1.12 : 1.0)
@@ -444,7 +557,7 @@ ApplicationWindow {
             textFormat: Text.PlainText
             Layout.alignment: Qt.AlignHCenter
             text: (band.signedValues && band.value > 0 ? "+" : "") + Math.round(band.value)
-            color: Math.round(band.value) === 0 ? window.txtFaint : window.accentSoft
+            color: Math.round(band.value) === 0 ? window.txtFaint : window.accentInk
             font.pixelSize: 12
             font.weight: Font.DemiBold
             Behavior on color { ColorAnimation { duration: window.tFast } }
@@ -505,7 +618,7 @@ ApplicationWindow {
                 width: 20
                 height: 20
                 radius: 10
-                color: "white"
+                color: window.knob
                 border.width: 2
                 border.color: window.accent
                 scale: vs.pressed ? 1.22 : (vs.hovered ? 1.1 : 1.0)
@@ -522,6 +635,118 @@ ApplicationWindow {
             color: window.txtFaint
             font.pixelSize: 10
             font.letterSpacing: 0.6
+        }
+    }
+
+    // Compact theme swatch, in the manner of macOS System Settings →
+    // Appearance: a thumbnail drawn from the target palette, its name
+    // beneath, and a ring with a 2pt gap marking the current choice.
+    component ThemeSwatch: Item {
+        id: sw2
+        property string themeKey: "midnight"
+        readonly property var t: window.themes[themeKey]
+        readonly property bool selected: window.themeId === themeKey
+
+        implicitWidth: 60
+        implicitHeight: 40 + 6 + swName.implicitHeight
+
+        HoverHandler { id: swHover; cursorShape: Qt.PointingHandCursor }
+        TapHandler { id: swTap; onTapped: window.applyTheme(sw2.themeKey) }
+
+        Accessible.role: Accessible.RadioButton
+        Accessible.name: window.tr("theme_" + themeKey)
+        Accessible.checked: selected
+
+        ToolTip.visible: swHover.hovered
+        ToolTip.delay: 600
+        ToolTip.text: window.tr("theme_" + themeKey) + " — " + window.tr("theme_" + themeKey + "_desc")
+
+        // Selection ring
+        Rectangle {
+            id: ring2
+            width: 60; height: 40
+            radius: 10
+            color: "transparent"
+            border.width: 2
+            border.color: sw2.selected ? window.accent
+                        : swHover.hovered ? window.lineHi : "transparent"
+            Behavior on border.color { ColorAnimation { duration: window.tBase } }
+        }
+
+        // Thumbnail
+        Rectangle {
+            id: thumb
+            x: 3; y: 3
+            width: 54; height: 34
+            radius: 7
+            color: sw2.t.bg
+            clip: true
+            border.width: 1
+            border.color: sw2.t.lineHi
+            scale: swTap.pressed ? 0.95 : 1.0
+            Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack } }
+
+            // Sidebar with the active nav item
+            Rectangle {
+                width: 16; height: parent.height
+                color: sw2.t.surface
+                Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: sw2.t.line }
+                Rectangle {
+                    x: 4; y: 5; width: 7; height: 7; radius: 2.5
+                    gradient: Gradient {
+                        GradientStop { position: 0.0; color: sw2.t.accentSoft }
+                        GradientStop { position: 1.0; color: sw2.t.accent }
+                    }
+                }
+                Rectangle { x: 3; y: 16; width: 10; height: 3; radius: 1.5; color: sw2.t.accentInk }
+                Rectangle { x: 3; y: 23; width: 8; height: 2; radius: 1; color: sw2.t.txtFaint }
+            }
+            // Card with a line of text and an accent toggle
+            Rectangle {
+                x: 20; y: 5
+                width: parent.width - 24; height: 15
+                radius: 3.5
+                color: sw2.t.surface
+                border.width: 1
+                border.color: sw2.t.line
+                Rectangle { x: 4; anchors.verticalCenter: parent.verticalCenter; width: 12; height: 2.5; radius: 1.25; color: sw2.t.txt }
+                Rectangle {
+                    anchors.right: parent.right; anchors.rightMargin: 3
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 12; height: 7; radius: 3.5
+                    color: sw2.t.accent
+                    Rectangle {
+                        anchors.right: parent.right; anchors.rightMargin: 1
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 5; height: 5; radius: 2.5
+                        color: sw2.t.accentFg
+                    }
+                }
+            }
+            // Slider in the accent, plus the ambient dot
+            Rectangle {
+                x: 20; y: 25; width: 20; height: 3; radius: 1.5
+                color: sw2.t.accent
+            }
+            Rectangle {
+                x: parent.width - 9; y: 23.5; width: 6; height: 6; radius: 3
+                color: sw2.t.ambientWarm
+            }
+        }
+
+        Text {
+            id: swName
+            textFormat: Text.PlainText
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 46
+            width: 66
+            horizontalAlignment: Text.AlignHCenter
+            text: window.tr("theme_" + sw2.themeKey + "_short")
+            color: sw2.selected ? window.txt : window.txtDim
+            font.pixelSize: 11
+            font.weight: sw2.selected ? Font.DemiBold : Font.Normal
+            elide: Text.ElideRight
+            Behavior on color { ColorAnimation { duration: window.tFast } }
         }
     }
 
@@ -547,6 +772,39 @@ ApplicationWindow {
         Component.onCompleted: if (visible) entrance.restart()
     }
 
+    // Cross-fade layer for theme switches (see applyTheme). Sits above
+    // everything, ignores input, and is empty except mid-transition.
+    Image {
+        id: themeSnapshot
+        z: 1000
+        anchors.fill: parent
+        opacity: 0
+        visible: opacity > 0
+        smooth: true
+        cache: false
+        NumberAnimation on opacity {
+            id: themeFade
+            running: false
+            from: 1; to: 0
+            duration: 320
+            easing.type: Easing.InOutQuad
+            onFinished: themeSnapshot.source = ""
+        }
+    }
+
+    // Everything the theme paints lives on this stage, so one grab
+    // captures the whole window for the cross-fade.
+    Item {
+    id: stage
+    objectName: "themeStage"
+    anchors.fill: parent
+
+    // Opaque base so the cross-fade snapshot carries the old background.
+    Rectangle {
+        anchors.fill: parent
+        color: window.bg
+    }
+
     // ==========================================================
     // ATMOSPHERE
     // ==========================================================
@@ -560,7 +818,7 @@ ApplicationWindow {
         width: 640; height: 640
         x: window.width - 380
         y: window.height - 340
-        tint: "#3B82F6"
+        tint: window.accentAlt
         strength: 0.10
     }
 
@@ -577,7 +835,7 @@ ApplicationWindow {
         Rectangle {
             Layout.fillHeight: true
             Layout.preferredWidth: 258
-            color: Qt.rgba(0.05, 0.055, 0.075, 0.72)
+            color: window.sidebar
 
             Rectangle {
                 anchors.right: parent.right
@@ -612,7 +870,7 @@ ApplicationWindow {
                         Text {
                             textFormat: Text.PlainText
                             text: "Center"
-                            color: window.accentSoft
+                            color: window.accentInk
                             font.pixelSize: 17
                             font.weight: Font.DemiBold
                             font.letterSpacing: -0.3
@@ -639,8 +897,10 @@ ApplicationWindow {
                                 id: ring
                                 anchors.fill: parent
                                 property real level: controller.connected ? Math.max(0, controller.batteryLevel) : 0
+                                readonly property string themeKey: window.themeId
                                 Behavior on level { NumberAnimation { duration: 700; easing.type: Easing.OutCubic } }
                                 onLevelChanged: requestPaint()
+                                onThemeKeyChanged: requestPaint()
 
                                 onPaint: {
                                     var ctx = getContext("2d")
@@ -649,13 +909,13 @@ ApplicationWindow {
                                     ctx.lineWidth = 3.5
                                     ctx.lineCap = "round"
 
-                                    ctx.strokeStyle = "#22252F"
+                                    ctx.strokeStyle = String(window.line)
                                     ctx.beginPath()
                                     ctx.arc(cx, cy, r, 0, Math.PI * 2)
                                     ctx.stroke()
 
                                     if (level > 0) {
-                                        ctx.strokeStyle = level > 20 ? "#2DD4A7" : "#FF5A5F"
+                                        ctx.strokeStyle = String(level > 20 ? window.success : window.danger)
                                         ctx.beginPath()
                                         ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (level / 100))
                                         ctx.stroke()
@@ -794,7 +1054,7 @@ ApplicationWindow {
                                 Glyph {
                                     path: navItem.modelData.glyph
                                     size: 19
-                                    color: navItem.current ? window.accentSoft
+                                    color: navItem.current ? window.accentInk
                                          : navHover.hovered ? window.txt : window.txtFaint
                                 }
 
@@ -1448,7 +1708,7 @@ ApplicationWindow {
                                 Text {
                                     textFormat: Text.PlainText
                                     text: controller.equalizerPresetName
-                                    color: window.accentSoft
+                                    color: window.accentInk
                                     font.pixelSize: 12
                                     font.weight: Font.DemiBold
                                 }
@@ -1561,7 +1821,7 @@ ApplicationWindow {
                                     textFormat: Text.PlainText
                                     anchors.centerIn: parent
                                     text: (controller.clearBass > 0 ? "+" : "") + controller.clearBass
-                                    color: window.accentSoft
+                                    color: window.accentInk
                                     font.pixelSize: 14
                                     font.weight: Font.DemiBold
                                 }
@@ -1650,7 +1910,7 @@ ApplicationWindow {
                                             anchors.centerIn: parent
                                             path: featCard.modelData.glyph
                                             size: 21
-                                            color: featCard.on ? window.accentSoft : window.txtFaint
+                                            color: featCard.on ? window.accentInk : window.txtFaint
                                         }
                                     }
 
@@ -1852,7 +2112,7 @@ ApplicationWindow {
                                             anchors.centerIn: parent
                                             path: window.icons.headphones
                                             size: 22
-                                            color: devCard.current ? window.accentSoft : window.txtFaint
+                                            color: devCard.current ? window.accentInk : window.txtFaint
                                         }
                                     }
 
@@ -1916,9 +2176,32 @@ ApplicationWindow {
             // 6 · SETTINGS
             // ==================================================
             ViewPage {
-                ColumnLayout {
+                // Settings outgrew one screen once Appearance arrived; it
+                // scrolls (trackpad momentum on macOS), the other pages don't.
+                Flickable {
+                    id: settingsFlick
                     anchors.fill: parent
-                    anchors.margins: 36
+                    contentWidth: width
+                    contentHeight: settingsCol.implicitHeight + 72
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    ScrollBar.vertical: ScrollBar {
+                        id: settingsBar
+                        policy: settingsFlick.contentHeight > settingsFlick.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                        contentItem: Rectangle {
+                            implicitWidth: 6
+                            radius: 3
+                            color: settingsBar.pressed ? window.txtFaint : window.lineHi
+                            opacity: settingsBar.active ? 1 : 0
+                            Behavior on opacity { NumberAnimation { duration: window.tBase } }
+                        }
+                    }
+
+                ColumnLayout {
+                    id: settingsCol
+                    x: 36
+                    y: 36
+                    width: settingsFlick.width - 72
                     spacing: 22
 
                     ColumnLayout {
@@ -1943,10 +2226,13 @@ ApplicationWindow {
                     // Card 1: System & Interface Preferences
                     Card {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 180
+                        Layout.preferredHeight: systemCol.implicitHeight + 44
 
                         ColumnLayout {
-                            anchors.fill: parent
+                            id: systemCol
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
                             anchors.margins: 22
                             spacing: 16
 
@@ -1967,7 +2253,7 @@ ApplicationWindow {
                                         anchors.centerIn: parent
                                         path: window.icons.power
                                         size: 18
-                                        color: window.accentSoft
+                                        color: window.accentInk
                                     }
                                 }
 
@@ -1983,6 +2269,8 @@ ApplicationWindow {
                                     }
                                     Text {
                                         textFormat: Text.PlainText
+                                        // fillWidth lets the row push its control to the trailing edge.
+                                        Layout.fillWidth: true
                                         text: window.tr("init_with_os_desc")
                                         color: window.txtDim
                                         font.pixelSize: 12
@@ -2018,7 +2306,7 @@ ApplicationWindow {
                                         anchors.centerIn: parent
                                         path: window.icons.globe
                                         size: 18
-                                        color: window.accentSoft
+                                        color: window.accentInk
                                     }
                                 }
 
@@ -2034,6 +2322,8 @@ ApplicationWindow {
                                     }
                                     Text {
                                         textFormat: Text.PlainText
+                                        // fillWidth lets the row push its control to the trailing edge.
+                                        Layout.fillWidth: true
                                         text: window.tr("language_desc")
                                         color: window.txtDim
                                         font.pixelSize: 12
@@ -2132,7 +2422,7 @@ ApplicationWindow {
                                                 textFormat: Text.PlainText
                                                 Layout.fillWidth: true
                                                 text: modelData.name
-                                                color: (modelData.code === controller.currentLanguage) ? window.accentSoft : window.txt
+                                                color: (modelData.code === controller.currentLanguage) ? window.accentInk : window.txt
                                                 font.pixelSize: 13
                                                 font.weight: (modelData.code === controller.currentLanguage) ? Font.DemiBold : Font.Normal
                                                 verticalAlignment: Text.AlignVCenter
@@ -2144,6 +2434,67 @@ ApplicationWindow {
                                                 radius: 3
                                                 color: window.accent
                                             }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: window.line
+                            }
+
+                            // Row 3: Appearance
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 16
+
+                                Rectangle {
+                                    Layout.preferredWidth: 38
+                                    Layout.preferredHeight: 38
+                                    Layout.alignment: Qt.AlignTop
+                                    radius: 11
+                                    color: Qt.rgba(window.accent.r, window.accent.g, window.accent.b, 0.14)
+                                    border.width: 1
+                                    border.color: Qt.rgba(window.accent.r, window.accent.g, window.accent.b, 0.35)
+
+                                    Glyph {
+                                        anchors.centerIn: parent
+                                        path: window.icons.palette
+                                        size: 18
+                                        color: window.accentInk
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    Layout.alignment: Qt.AlignTop
+                                    spacing: 3
+                                    Text {
+                                        textFormat: Text.PlainText
+                                        text: window.tr("appearance")
+                                        color: window.txt
+                                        font.pixelSize: 14
+                                        font.weight: Font.DemiBold
+                                    }
+                                    Text {
+                                        textFormat: Text.PlainText
+                                        Layout.fillWidth: true
+                                        text: window.tr("appearance_desc")
+                                        color: window.txtDim
+                                        font.pixelSize: 12
+                                        wrapMode: Text.WordWrap
+                                    }
+                                }
+
+                                Row {
+                                    spacing: 8
+                                    Repeater {
+                                        model: window.themeOrder
+                                        delegate: ThemeSwatch {
+                                            required property string modelData
+                                            themeKey: modelData
                                         }
                                     }
                                 }
@@ -2204,7 +2555,7 @@ ApplicationWindow {
                                             id: verLabel
                                             anchors.centerIn: parent
                                             text: "v" + controller.appVersion
-                                            color: window.accentSoft
+                                            color: window.accentInk
                                             font.pixelSize: 11
                                             font.weight: Font.DemiBold
                                         }
@@ -2359,10 +2710,10 @@ ApplicationWindow {
                         lineHeight: 1.4
                         wrapMode: Text.WordWrap
                     }
-
-                    Item { Layout.fillHeight: true }
+                }
                 }
             }
         }
     }
+    } // stage
 }
