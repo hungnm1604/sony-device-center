@@ -54,6 +54,11 @@ class DeviceCenterController : public QObject {
     Q_PROPERTY(bool hasDsee READ hasDsee NOTIFY capabilitiesChanged)
     Q_PROPERTY(bool hasSpeakToChat READ hasSpeakToChat NOTIFY capabilitiesChanged)
     Q_PROPERTY(bool hasSpeakToChatTimeout READ hasSpeakToChatTimeout NOTIFY capabilitiesChanged)
+    Q_PROPERTY(bool hasAutoPowerOff READ hasAutoPowerOff NOTIFY capabilitiesChanged)
+    Q_PROPERTY(bool hasPowerOff READ hasPowerOff NOTIFY capabilitiesChanged)
+    // "timed" (Off/5 min/30 min/1 h/3 h/taken off) or "takenOff" (Off or
+    // when taken off only, e.g. WH-1000XM5).
+    Q_PROPERTY(QString autoPowerOffMode READ autoPowerOffMode NOTIFY capabilitiesChanged)
     // 0 ~15 s, 1 Standard ~30 s, 2 ~1 min, 3 never. Not readable from the
     // headset, so this is the user's saved choice, re-sent on every enable.
     Q_PROPERTY(int speakToChatTimeout READ speakToChatTimeout NOTIFY speakToChatTimeoutChanged)
@@ -108,6 +113,9 @@ public:
     [[nodiscard]] bool hasDsee() const;
     [[nodiscard]] bool hasSpeakToChat() const;
     [[nodiscard]] bool hasSpeakToChatTimeout() const;
+    [[nodiscard]] bool hasAutoPowerOff() const;
+    [[nodiscard]] bool hasPowerOff() const;
+    [[nodiscard]] QString autoPowerOffMode() const;
     [[nodiscard]] int speakToChatTimeout() const;
     [[nodiscard]] QString firmware() const;
     [[nodiscard]] bool hasAdaptiveVolume() const;
@@ -128,6 +136,7 @@ public:
     Q_INVOKABLE void setDsee(bool enabled);
     Q_INVOKABLE void setSpeakToChat(bool enabled);
     Q_INVOKABLE void setSpeakToChatTimeout(int timeout);
+    Q_INVOKABLE void powerOffHeadphones();
     Q_INVOKABLE void setAdaptiveVolume(bool enabled);
     Q_INVOKABLE void setAutoPowerOff(int index);
 

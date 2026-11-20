@@ -1,4 +1,6 @@
 #include "sony/protocol/ProtocolV2.h"
+
+#include <cstdio>
 #include "ProtocolHelpers.h"
 #include "NoiseControlCodec.h"
 #include <algorithm>
@@ -12,18 +14,23 @@ using detail::codecName;
 namespace {
 
 // Auto-power-off codes: 0=Off, 1=5min, 2=30min, 3=1h, 4=3h, 5=when-taken-off
+// (same table as Gadgetbridge's AutomaticPowerOff).
 const std::pair<uint8_t, uint8_t> APO_CODES[] = {
     { 0x11, 0x00 }, { 0x00, 0x00 }, { 0x01, 0x01 }, { 0x02, 0x02 }, { 0x03, 0x03 }, { 0x10, 0x00 }
 };
 
+// -1 for a pair outside the table. It used to fall back to 0 (Off), which
+// made an unrecognised reading look like the user's choice had been lost.
 int apoIndexFromCode(uint8_t c0, uint8_t c1) {
     for (int i = 0; i < 6; i++) {
         if (APO_CODES[i].first == c0 && APO_CODES[i].second == c1) {
             return i;
         }
     }
-    return 0;
+    return -1;
 }
+
+constexpr uint8_t kApoInquired = 0x05;  // 0x01 on the same opcode is "pause when taken off"
 
 } // namespace
 
@@ -267,17 +274,23 @@ std::string ProtocolV2::getCodec() {
 }
 
 int ProtocolV2::getAutoPowerOff() {
-    // GET: 26 05 -> RET: 27 05 <c0> <c1>
+    // GET: 26 05 -> RET: 27 05 <c0> <c1>. Matched on subtype 0x05 so a 0x01
+    // ("pause when taken off") reply on the same opcode is never decoded here.
     auto resp = _session.sendAndAwaitResponse(
-        SonyFrame{ .type = DataType::DataMdr, .payload = {0x26, 0x05} },
+        SonyFrame{ .type = DataType::DataMdr, .payload = {0x26, kApoInquired} },
         0x27,
-        -1,
+        kApoInquired,
         std::chrono::milliseconds(1000)
     );
-    if (resp.payload.size() >= 4) {
-        return apoIndexFromCode(resp.payload[2], resp.payload[3]);
+    if (resp.payload.size() < 4 || resp.payload[1] != kApoInquired)
+        throw SonyException(SonyErrorCode::InvalidResponse, "Incomplete AutoPowerOff response");
+    const int index = apoIndexFromCode(resp.payload[2], resp.payload[3]);
+    if (index < 0) {
+        char code[16];
+        std::snprintf(code, sizeof code, "%02x %02x", resp.payload[2], resp.payload[3]);
+        throw SonyException(SonyErrorCode::InvalidResponse, std::string("Unrecognised AutoPowerOff code ") + code);
     }
-    throw SonyException(SonyErrorCode::InvalidResponse, "Incomplete AutoPowerOff response");
+    return index;
 }
 
 void ProtocolV2::setAutoPowerOff(int index) {
@@ -292,6 +305,12 @@ void ProtocolV2::setAutoPowerOff(int index) {
         APO_CODES[index].second
     };
     _session.send(SonyFrame{ .type = DataType::DataMdr, .payload = std::move(payload) });
+}
+
+void ProtocolV2::powerOff() {
+    // POWER_SET: 24 03 01. The headset may drop the link before its ACK
+    // arrives; SonyDevice treats that as success.
+    _session.send(SonyFrame{ .type = DataType::DataMdr, .payload = {0x24, 0x03, 0x01} });
 }
 
 bool ProtocolV2::getSpeakToChat() {

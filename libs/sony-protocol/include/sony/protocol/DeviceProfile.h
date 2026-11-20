@@ -70,6 +70,17 @@ struct DeviceCapabilities
     // Talking Mode config layout (FC 05 00 <sens> <focus> <timeout>) is
     // documented; V2 keeps its device default until a capture confirms it.
     bool speakToChatTimeout = false;
+
+    // Remote power off. V2 POWER_SET `24 03 01` (layout from Gadgetbridge's
+    // SonyProtocolImplV2.powerOff). Enabled per model only once that model
+    // is named here; V1 0x22 is never sent by this path.
+    bool powerOff = false;
+
+    // Auto power off is only Off / "when taken off" (indices 0 and 5 of the
+    // APO table); the timed codes are not supported. Gadgetbridge declares
+    // only AutomaticPowerOffWhenTakenOff for the WH-1000XM5, and an XM5 on
+    // firmware 2.5.1 answered a written 5-minute code (00 00) with 10 00.
+    bool autoPowerOffTakenOffOnly = false;
 };
 
 struct DeviceProfile

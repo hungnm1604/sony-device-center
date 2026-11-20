@@ -174,6 +174,9 @@ bool DeviceCenterController::hasSpeakToChat() const { return _capabilities.value
 
 bool DeviceCenterController::hasSpeakToChatTimeout() const { return _capabilities.value("speakToChatTimeout").toBool(); }
 int DeviceCenterController::speakToChatTimeout() const { return _speakToChatTimeout; }
+bool DeviceCenterController::hasAutoPowerOff() const { return _capabilities.value("autoPowerOff").toBool(); }
+bool DeviceCenterController::hasPowerOff() const { return _capabilities.value("powerOff").toBool(); }
+QString DeviceCenterController::autoPowerOffMode() const { return _capabilities.value("autoPowerOffMode").toString("timed"); }
 QString DeviceCenterController::firmware() const { return _firmware; }
 
 bool DeviceCenterController::hasAdaptiveVolume() const { return _capabilities.value("adaptiveVolume").toBool(); }
@@ -196,6 +199,9 @@ void DeviceCenterController::setSpeakToChat(bool enabled) {
     QJsonObject params{{"enabled", enabled}};
     if (enabled && hasSpeakToChatTimeout()) params.insert("timeout", _speakToChatTimeout);
     _send("speakToChat", params);
+}
+void DeviceCenterController::powerOffHeadphones() {
+    if (_connected && hasPowerOff()) _send("powerOff");
 }
 void DeviceCenterController::setSpeakToChatTimeout(int timeout) {
     timeout = std::clamp(timeout, 0, 3);

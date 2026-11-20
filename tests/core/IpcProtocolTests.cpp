@@ -256,10 +256,12 @@ TEST_CASE("IpcProtocol execution through DeviceService", "[core][ipc]") {
         CHECK(dseeResp.success);
         CHECK(service.snapshot()->dsee == true);
 
-        // Auto Power Off
-        auto apoResp = IpcProtocol::execute(IpcProtocol::parseCommand("apo 3"), service);
+        // Auto Power Off: an XM5 only has Off and "when taken off" (5); a timed
+        // code such as 3 (1 hour) is refused rather than misapplied.
+        auto apoResp = IpcProtocol::execute(IpcProtocol::parseCommand("apo 5"), service);
         CHECK(apoResp.success);
-        CHECK(service.snapshot()->autoPowerOff == 3);
+        CHECK(service.snapshot()->autoPowerOff == 5);
+        CHECK_FALSE(IpcProtocol::execute(IpcProtocol::parseCommand("apo 3"), service).success);
 
         service.disconnect();
         CHECK_FALSE(service.isConnected());

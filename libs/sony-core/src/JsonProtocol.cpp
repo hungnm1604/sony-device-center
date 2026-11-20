@@ -31,7 +31,8 @@ Json JsonProtocol::snapshot(IDeviceService& service) {
             {"equalizer", c.equalizer}, {"clearBass", c.clearBass}, {"tenBandEqualizer", c.tenBandEqualizer},
             {"dsee", c.dsee}, {"battery", c.battery},
             {"speakToChat", c.speakToChat}, {"speakToChatTimeout", c.speakToChatTimeout},
-            {"adaptiveVolume", c.adaptiveVolume}, {"autoPowerOff", c.autoPowerOff}}},
+            {"adaptiveVolume", c.adaptiveVolume}, {"autoPowerOff", c.autoPowerOff}, {"powerOff", c.powerOff},
+            {"autoPowerOffMode", c.autoPowerOffTakenOffOnly ? "takenOff" : "timed"}}},
         {"features", features},
         {"battery", {{"main", optional(s->battery.main)}, {"left", optional(s->battery.left)}, {"right", optional(s->battery.right)},
             {"case", optional(s->battery.caseBattery)}, {"charging", s->battery.charging}}},
@@ -114,9 +115,17 @@ Json JsonProtocol::execute(const Json& request, IDeviceService& service) {
                     dev->setSpeakToChatTimeout(integer(params, "timeout", 0, 3));
                 dev->setSpeakToChat(params.at("enabled").get<bool>());
             }
+            else if (method == "powerOff") { supported(c.powerOff); dev->powerOff(); }
             else if (method == "speakToChatTimeout") { supported(c.speakToChatTimeout); dev->setSpeakToChatTimeout(integer(params, "timeout", 0, 3)); }
             else if (method == "adaptiveVolume") { supported(c.adaptiveVolume); dev->setAdaptiveVolume(params.at("enabled").get<bool>()); }
-            else if (method == "autoPowerOff") { supported(c.autoPowerOff); dev->setAutoPowerOff(integer(params, "index", 0, 5)); }
+            else if (method == "autoPowerOff") {
+                supported(c.autoPowerOff);
+                const int index = integer(params, "index", 0, 5);
+                // Never write a timed code to a model that reinterprets it.
+                if (c.autoPowerOffTakenOffOnly && index != 0 && index != 5)
+                    throw std::invalid_argument("This model only supports Off (0) or When taken off (5)");
+                dev->setAutoPowerOff(index);
+            }
             else throw std::invalid_argument("Unknown method: " + method);
             data = snapshot(service);
         }

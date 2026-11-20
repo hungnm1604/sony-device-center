@@ -87,7 +87,9 @@ const std::vector<DeviceProfile>& getStaticProfiles() {
                 .firmwareInfo = true,
                 .codecInfo = true,
                 .wearSensor = true,
-                .multipoint = true
+                .multipoint = true,
+                .powerOff = true,
+                .autoPowerOffTakenOffOnly = true
             }
         },
         // WH-1000XM6 (V2 protocol, 10-band equalizer -- no separate Clear

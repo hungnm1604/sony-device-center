@@ -322,6 +322,17 @@ void SonyDevice::setAutoPowerOff(int index) {
     _dispatcher.dispatch(protocol::DeviceStateChanged{snapshot()});
 }
 
+void SonyDevice::powerOff() {
+    if (!_protocol) return;
+    try {
+        _protocol->powerOff();
+    } catch (const SonyException& ex) {
+        // A headset that powers down before acknowledging looks like a
+        // timeout or a dropped link; that is the requested outcome.
+        if (ex.code() != SonyErrorCode::Timeout && ex.code() != SonyErrorCode::Disconnected) throw;
+    }
+}
+
 void SonyDevice::setSpeakToChatTimeout(int timeout) {
     if (!_protocol) return;
     bool enabled = false;

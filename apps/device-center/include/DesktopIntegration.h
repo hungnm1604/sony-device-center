@@ -25,6 +25,9 @@ class DesktopIntegration : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool trayAvailable READ trayAvailable CONSTANT)
     Q_PROPERTY(bool menuBarIcon READ menuBarIcon WRITE setMenuBarIcon NOTIFY preferencesChanged)
+    // Battery percentage next to the menu bar glyph (macOS native item only).
+    Q_PROPERTY(bool menuBarPercentAvailable READ menuBarPercentAvailable CONSTANT)
+    Q_PROPERTY(bool menuBarPercent READ menuBarPercent WRITE setMenuBarPercent NOTIFY preferencesChanged)
     Q_PROPERTY(bool globalShortcutAvailable READ globalShortcutAvailable CONSTANT)
     Q_PROPERTY(bool globalShortcut READ globalShortcut WRITE setGlobalShortcut NOTIFY preferencesChanged)
     Q_PROPERTY(QString globalShortcutLabel READ globalShortcutLabel CONSTANT)
@@ -37,6 +40,8 @@ public:
 
     [[nodiscard]] bool trayAvailable() const;
     [[nodiscard]] bool menuBarIcon() const { return _menuBarIcon; }
+    [[nodiscard]] bool menuBarPercentAvailable() const;
+    [[nodiscard]] bool menuBarPercent() const { return _menuBarPercent; }
     [[nodiscard]] bool globalShortcutAvailable() const;
     [[nodiscard]] bool globalShortcut() const { return _globalShortcut; }
     [[nodiscard]] QString globalShortcutLabel() const;
@@ -44,6 +49,7 @@ public:
     [[nodiscard]] bool reduceMotion() const { return _reduceMotion; }
 
     Q_INVOKABLE void setMenuBarIcon(bool enabled);
+    Q_INVOKABLE void setMenuBarPercent(bool enabled);
     Q_INVOKABLE void setGlobalShortcut(bool enabled);
     Q_INVOKABLE void setBatteryAlerts(bool enabled);
 
@@ -62,9 +68,12 @@ signals:
 private:
     void _buildTray();
     void _refreshTray();
+    void _refreshDevices();
     void _checkBattery();
     void _applyHotkey();
     void _setReduceMotion(bool value);
+    [[nodiscard]] bool _hasIcon() const;
+    void _notify(const QString& title, const QString& body);
 
     QPointer<DeviceCenterController> _controller;
     std::unique_ptr<QMenu> _menu;
@@ -73,11 +82,15 @@ private:
     QAction* _anc{nullptr};
     QAction* _ambient{nullptr};
     QAction* _off{nullptr};
+    QAction* _powerOff{nullptr};
     QAction* _open{nullptr};
+    QMenu* _devices{nullptr};
+    QString _devicesSignature;  // skip rebuilding an unchanged (possibly open) submenu
     QAction* _quit{nullptr};
     QActionGroup* _modes{nullptr};
 
     bool _menuBarIcon{true};
+    bool _menuBarPercent{true};
     bool _globalShortcut{true};
     bool _batteryAlerts{true};
     bool _reduceMotion{false};

@@ -320,3 +320,63 @@ TEST_CASE("ProtocolV2: WF-1000XM4 collects TWS records after an aggregate reply"
         CHECK_FALSE(state.caseBattery);
     }
 }
+
+namespace {
+std::vector<std::vector<uint8_t>> v2DataPayloads(const FakeTransport& fake) {
+    std::vector<std::vector<uint8_t>> payloads;
+    for (const auto& bytes : fake.sentFrames()) {
+        auto decoded = FrameCodec::decode(bytes);
+        if (decoded.type == DataType::DataMdr) payloads.push_back(decoded.payload);
+    }
+    return payloads;
+}
+} // namespace
+
+TEST_CASE("ProtocolV2: power off sends POWER_SET 24 03 01 only", "[protocol][v2][power]")
+{
+    ReplyingFakeTransport fake;
+    SonyProtocolSession session(&fake);
+    session.connect("11:22:33:44:55:66");
+    ProtocolV2 v2(session);
+
+    fake.queueReply({ SonyFrame{ .type = DataType::Ack, .sequence = 0 } });
+    v2.powerOff();
+    REQUIRE(v2DataPayloads(fake) == std::vector<std::vector<uint8_t>>{ {0x24, 0x03, 0x01} });
+}
+
+TEST_CASE("ProtocolV2: auto power-off reading is strict", "[protocol][v2][apo]")
+{
+    SECTION("Known code decodes to its index")
+    {
+        FakeTransport fake;
+        SonyProtocolSession session(&fake);
+        session.connect("11:22:33:44:55:66");
+        ProtocolV2 v2(session);
+        fake.queueIncoming(FrameCodec::encode(SonyFrame{ .type = DataType::Ack, .sequence = 0 }));
+        fake.queueIncoming(FrameCodec::encode(SonyFrame{ .type = DataType::DataMdr, .sequence = 1, .payload = {0x27, 0x05, 0x00, 0x00} }));
+        REQUIRE(v2.getAutoPowerOff() == 1);  // 5 minutes
+        REQUIRE(v2DataPayloads(fake).front() == std::vector<uint8_t>{0x26, 0x05});
+    }
+
+    SECTION("Unknown code is an error, not a silent Off")
+    {
+        FakeTransport fake;
+        SonyProtocolSession session(&fake);
+        session.connect("11:22:33:44:55:66");
+        ProtocolV2 v2(session);
+        fake.queueIncoming(FrameCodec::encode(SonyFrame{ .type = DataType::Ack, .sequence = 0 }));
+        fake.queueIncoming(FrameCodec::encode(SonyFrame{ .type = DataType::DataMdr, .sequence = 1, .payload = {0x27, 0x05, 0x04, 0x04} }));
+        REQUIRE_THROWS_AS(v2.getAutoPowerOff(), SonyException);
+    }
+
+    SECTION("Set writes 28 05 <c0> <c1> from the shared table")
+    {
+        ReplyingFakeTransport fake;
+        SonyProtocolSession session(&fake);
+        session.connect("11:22:33:44:55:66");
+        ProtocolV2 v2(session);
+        fake.queueReply({ SonyFrame{ .type = DataType::Ack, .sequence = 0 } });
+        v2.setAutoPowerOff(1);
+        REQUIRE(v2DataPayloads(fake) == std::vector<std::vector<uint8_t>>{ {0x28, 0x05, 0x00, 0x00} });
+    }
+}

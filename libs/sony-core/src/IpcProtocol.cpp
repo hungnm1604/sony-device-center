@@ -358,6 +358,11 @@ IpcResponse IpcProtocol::execute(const IpcCommand& cmd, IDeviceService& service)
                     idx = std::clamp(std::stoi(cmd.args[0]), 0, 5);
                 } catch (...) {}
             }
+            if (dev->capabilities().autoPowerOffTakenOffOnly && idx != 0 && idx != 5) {
+                resp.success = false;
+                resp.message = "This model only supports auto power off 0 (Off) or 5 (When taken off)";
+                return resp;
+            }
             dev->setAutoPowerOff(idx);
             resp.success = true;
             resp.message = "Auto power off set to index " + std::to_string(idx);

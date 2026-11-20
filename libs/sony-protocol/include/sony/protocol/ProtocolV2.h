@@ -44,6 +44,7 @@ public:
 
     int getAutoPowerOff() override;
     void setAutoPowerOff(int index) override;
+    void powerOff() override;
 
     bool getSpeakToChat() override;
     void setSpeakToChat(bool enabled) override;

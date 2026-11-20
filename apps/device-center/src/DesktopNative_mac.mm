@@ -1,6 +1,7 @@
 #include "DesktopNative.h"
 
 #import <AppKit/AppKit.h>
+#import <UserNotifications/UserNotifications.h>
 #include <Carbon/Carbon.h>
 
 // Carbon's RegisterEventHotKey is still the supported way to own a global
@@ -57,6 +58,67 @@ void unregisterHotkey(Handle handle) {
     if (state->ref) UnregisterEventHotKey(state->ref);
     if (state->handler) RemoveEventHandler(state->handler);
     delete state;
+}
+
+bool statusItemSupported() { return true; }
+
+Handle createStatusItem(void* nsMenu) {
+    NSStatusItem* item = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
+    [item retain];
+    item.menu = static_cast<NSMenu*>(nsMenu);
+    item.button.imagePosition = NSImageLeft;
+    // Monospaced digits keep the item from jittering as the percentage changes.
+    item.button.font = [NSFont monospacedDigitSystemFontOfSize:[NSFont systemFontSize] weight:NSFontWeightRegular];
+    return item;
+}
+
+void updateStatusItem(Handle handle, const QImage& glyph, const QString& title, const QString& toolTip) {
+    auto* item = static_cast<NSStatusItem*>(handle);
+    if (!item) return;
+    if (!glyph.isNull()) {
+        CGImageRef cg = glyph.toCGImage();
+        const qreal dpr = glyph.devicePixelRatio() > 0 ? glyph.devicePixelRatio() : 1.0;
+        NSImage* image = [[NSImage alloc] initWithCGImage:cg size:NSMakeSize(glyph.width() / dpr, glyph.height() / dpr)];
+        CGImageRelease(cg);
+        [image setTemplate:YES];  // ("template" is a C++ keyword) the menu bar tints it for light, dark and highlighted states
+        item.button.image = image;
+        [image release];
+    }
+    item.button.title = title.isEmpty() ? @"" : [@" " stringByAppendingString:title.toNSString()];
+    item.button.toolTip = toolTip.toNSString();
+}
+
+void setStatusItemVisible(Handle handle, bool visible) {
+    auto* item = static_cast<NSStatusItem*>(handle);
+    if (item) item.visible = visible;
+}
+
+void destroyStatusItem(Handle handle) {
+    auto* item = static_cast<NSStatusItem*>(handle);
+    if (!item) return;
+    [[NSStatusBar systemStatusBar] removeStatusItem:item];
+    [item release];
+}
+
+void postNotification(const QString& title, const QString& body) {
+    // UNUserNotificationCenter raises for a process without a bundle id
+    // (an unbundled dev binary), so only bundled builds post.
+    if (![[NSBundle mainBundle] bundleIdentifier]) return;
+    UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
+    NSString* t = title.toNSString();
+    NSString* b = body.toNSString();
+    [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound)
+                          completionHandler:^(BOOL granted, NSError*) {
+        if (!granted) return;
+        UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
+        content.title = t;
+        content.body = b;
+        content.sound = [UNNotificationSound defaultSound];
+        UNNotificationRequest* request = [UNNotificationRequest requestWithIdentifier:@"battery-low"
+                                                                              content:content trigger:nil];
+        [center addNotificationRequest:request withCompletionHandler:nil];
+        [content release];
+    }];
 }
 
 bool reduceMotion() {

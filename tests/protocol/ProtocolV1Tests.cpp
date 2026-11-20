@@ -390,3 +390,15 @@ TEST_CASE("ProtocolV1: unsupported features throw Unsupported", "[protocol][v1]"
     REQUIRE_THROWS_AS(v1.getAutoPowerOff(), SonyException);
     REQUIRE(fake.sentCount() == 0);
 }
+
+TEST_CASE("ProtocolV1: power off is unsupported and sends nothing", "[protocol][v1][power][regression]")
+{
+    // 0x22 is POWER OFF on V1 but its payload is unverified, so the generic
+    // path must refuse rather than guess.
+    FakeTransport fake;
+    SonyProtocolSession session(&fake);
+    session.connect("11:22:33:44:55:66");
+    ProtocolV1 v1(session);
+    REQUIRE_THROWS_AS(v1.powerOff(), SonyException);
+    REQUIRE(dataRequestPayloads(fake).empty());
+}

@@ -51,6 +51,12 @@ public:
         throw SonyException(SonyErrorCode::Unsupported, "Speak-to-Chat timeout is not supported");
     }
 
+    // Turns the headset off. The link drops right after, so callers must not
+    // expect a reply. Unsupported unless a generation overrides it.
+    virtual void powerOff() {
+        throw SonyException(SonyErrorCode::Unsupported, "Remote power off is not supported");
+    }
+
     virtual bool getAdaptiveVolume() = 0;
     virtual void setAdaptiveVolume(bool enabled) = 0;
 };

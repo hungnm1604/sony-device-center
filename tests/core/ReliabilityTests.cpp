@@ -246,3 +246,27 @@ TEST_CASE("Speak-to-Chat timeout is offered and range-checked only on WH-1000XM4
     CHECK(call({{"timeout",-1}})["error"]["code"] == "InvalidRequest");
     service.disconnect();
 }
+
+TEST_CASE("Remote power off is offered only where its frame is known", "[core][json][power]") {
+    auto transport = std::make_shared<ReplyTransport>();
+    DeviceService service(transport);
+    service.connect(DeviceAddress("11:22:33:44:55:66"), "WH-1000XM4");
+    CHECK(JsonProtocol::snapshot(service)["capabilities"]["powerOff"] == false);
+    CHECK(JsonProtocol::execute({{"version",1},{"id",1},{"method","powerOff"}}, service)["error"]["code"] == "Unsupported");
+    service.disconnect();
+    service.connect(DeviceAddress("11:22:33:44:55:66"), "WH-1000XM5");
+    CHECK(JsonProtocol::snapshot(service)["capabilities"]["powerOff"] == true);
+    service.disconnect();
+}
+
+TEST_CASE("WH-1000XM5 auto power off accepts only Off or When taken off", "[core][json][apo]") {
+    auto transport = std::make_shared<ReplyTransport>();
+    DeviceService service(transport);
+    service.connect(DeviceAddress("11:22:33:44:55:66"), "WH-1000XM5");
+    CHECK(JsonProtocol::snapshot(service)["capabilities"]["autoPowerOffMode"] == "takenOff");
+    // Index 1 is the 5-minute code 00 00, which an XM5 stores as "when taken off".
+    CHECK(JsonProtocol::execute({{"version",1},{"id",1},{"method","autoPowerOff"},{"params",{{"index",1}}}}, service)["error"]["code"] == "InvalidRequest");
+    auto text = IpcProtocol::execute(IpcProtocol::parseCommand("apo 2"), service);
+    CHECK_FALSE(text.success);
+    service.disconnect();
+}

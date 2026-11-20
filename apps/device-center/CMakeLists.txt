@@ -44,7 +44,7 @@ add_executable(sony-device-center
 # QtWidgets class, hence the Widgets dependency and QApplication in main.cpp.
 if(APPLE)
     target_sources(sony-device-center PRIVATE src/DesktopNative_mac.mm)
-    target_link_libraries(sony-device-center PRIVATE "-framework AppKit" "-framework Carbon")
+    target_link_libraries(sony-device-center PRIVATE "-framework AppKit" "-framework Carbon" "-framework UserNotifications")
 else()
     target_sources(sony-device-center PRIVATE src/DesktopNative_stub.cpp)
 endif()
