@@ -1210,62 +1210,34 @@ ApplicationWindow {
         }
     }
 
-    // Shown in place of a device page while no headset is connected, so the
-    // page explains itself and offers the next step instead of dead controls.
-    component OfflineState: Item {
+    // A quiet inline prompt keeps each page useful to browse while offline.
+    // Device-specific controls remain visible in a disabled preview state.
+    component OfflineState: Rectangle {
         visible: !controller.connected
-        ColumnLayout {
-            anchors.centerIn: parent
-            width: Math.min(parent.width - 64, 380)
-            spacing: 12
-            Rectangle {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.preferredWidth: 56
-                Layout.preferredHeight: 56
-                radius: 16
-                color: window.surfaceSunk
-                border.width: 1
-                border.color: window.line
-                Glyph { anchors.centerIn: parent; path: window.icons.headphones; size: 26; color: window.txtFaint }
-            }
-            Text {
-                textFormat: Text.PlainText
+        Layout.fillWidth: true
+        Layout.preferredHeight: 54
+        radius: 13
+        color: window.surfaceSunk
+        border.width: 1
+        border.color: window.line
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 14
+            anchors.rightMargin: 12
+            spacing: 10
+            Glyph { path: window.icons.bluetooth; size: 16; color: window.accentInk }
+            ColumnLayout {
                 Layout.fillWidth: true
-                horizontalAlignment: Text.AlignHCenter
-                text: window.tr("offline_title")
-                color: window.txt
-                font.pixelSize: 17
-                font.weight: Font.DemiBold
-                wrapMode: Text.WordWrap
+                spacing: 1
+                Text { textFormat: Text.PlainText; text: window.tr("offline_title"); color: window.txt; font.pixelSize: 12; font.weight: Font.DemiBold }
+                Text { textFormat: Text.PlainText; text: window.tr("offline_body"); color: window.txtDim; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
             }
-            Text {
-                textFormat: Text.PlainText
-                Layout.fillWidth: true
-                horizontalAlignment: Text.AlignHCenter
-                text: window.tr("offline_body") + "  " + window.tr("state_" + controller.connectionState)
-                color: window.txtDim
-                font.pixelSize: 12
-                lineHeight: 1.3
-                wrapMode: Text.WordWrap
-            }
-            RowLayout {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 6
-                spacing: 8
-                PillButton {
-                    compact: true
-                    active: true
-                    glyphPath: window.icons.swap
-                    text: window.tr("choose_device")
-                    onClicked: window.openDevicePicker()
-                }
-                PillButton {
-                    visible: Qt.platform.os === "osx"
-                    compact: true
-                    glyphPath: window.icons.bluetooth
-                    text: window.tr("bluetooth_settings")
-                    onClicked: controller.openUrl("x-apple.systempreferences:com.apple.BluetoothSettings")
-                }
+            PillButton {
+                compact: true
+                active: true
+                glyphPath: window.icons.swap
+                text: window.tr("choose_device")
+                onClicked: window.openDevicePicker()
             }
         }
     }
@@ -1570,8 +1542,8 @@ ApplicationWindow {
                                 visible: !controller.isCharging
                                 text: controller.connected && controller.batteryLevel >= 0 ? controller.batteryLevel : "—"
                                 color: window.txt
-                                font.pixelSize: 13
-                                font.weight: Font.DemiBold
+                                font.pixelSize: 15
+                                font.weight: Font.Bold
                             }
                         }
 
@@ -1934,12 +1906,13 @@ ApplicationWindow {
                                         }
                                         Text {
                                             textFormat: Text.PlainText
-                                            Layout.preferredWidth: 46
+                                            Layout.preferredWidth: 64
                                             horizontalAlignment: Text.AlignRight
                                             text: modelData.v >= 0 ? modelData.v + "%" + (controller.isCharging && modelData.k === window.tr("battery") ? " ⚡" : "") : "—"
-                                            color: window.txt
-                                            font.pixelSize: 12
-                                            font.weight: Font.DemiBold
+                                            color: modelData.v >= 0 && modelData.v <= 20 ? window.danger : window.txt
+                                            font.pixelSize: 17
+                                            font.weight: Font.Bold
+                                            font.features: { "tnum": 1 }
                                         }
                                     }
                                 }
@@ -2247,13 +2220,13 @@ ApplicationWindow {
             // 2 · EQUALIZER
             // ==================================================
             ViewPage {
-                OfflineState { anchors.fill: parent }
-
                 ColumnLayout {
-                    visible: controller.connected
+                    visible: true
                     anchors.fill: parent
                     anchors.margins: 32
                     spacing: 20
+
+                    OfflineState { }
 
                     ColumnLayout {
                         spacing: 5
@@ -2271,6 +2244,8 @@ ApplicationWindow {
                     Flow {
                         Layout.fillWidth: true
                         spacing: 8
+                        enabled: controller.connected
+                        opacity: controller.connected ? 1 : 0.45
 
                         Repeater {
                             model: controller.tenBandEqualizer ? [
@@ -2338,6 +2313,8 @@ ApplicationWindow {
                     Card {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        enabled: controller.connected
+                        opacity: controller.connected ? 1 : 0.62
 
                         ColumnLayout {
                             anchors.fill: parent
@@ -2441,6 +2418,9 @@ ApplicationWindow {
                     // Clear Bass
                     Card {
                         visible: controller.hasClearBass
+                               || !controller.connected
+                        enabled: controller.connected
+                        opacity: controller.connected ? 1 : 0.62
                         Layout.fillWidth: true
                         Layout.preferredHeight: 96
 
@@ -2500,13 +2480,13 @@ ApplicationWindow {
             // 3 · AUDIO FEATURES
             // ==================================================
             ViewPage {
-                OfflineState { anchors.fill: parent }
-
                 ColumnLayout {
-                    visible: controller.connected
+                    visible: true
                     anchors.fill: parent
                     anchors.margins: 32
                     spacing: 22
+
+                    OfflineState { }
 
                     ColumnLayout {
                         spacing: 5
@@ -2541,7 +2521,8 @@ ApplicationWindow {
                                 readonly property bool known: controller.connected && availability && availability.availability === "valid"
                                 readonly property bool supported: modelData.key === "dsee" ? controller.hasDsee : modelData.key === "speak" ? controller.hasSpeakToChat : controller.hasAdaptiveVolume
                                 enabled: supported && controller.connected
-                                visible: supported
+                                opacity: controller.connected ? 1 : 0.62
+                                visible: supported || !controller.connected
                                 readonly property bool on: modelData.key === "dsee" ? controller.dsee
                                                          : modelData.key === "speak" ? controller.speakToChat
                                                          : controller.adaptiveVolume
@@ -2591,7 +2572,9 @@ ApplicationWindow {
                                         Text {
                                             textFormat: Text.PlainText
                                             Layout.fillWidth: true
-                                            text: !featCard.supported ? window.tr("not_supported") : !featCard.known ? window.tr("state_waiting") : featCard.modelData.desc
+                                            text: !controller.connected ? window.tr("features_offline")
+                                                  : !featCard.supported ? window.tr("not_supported")
+                                                  : !featCard.known ? window.tr("state_waiting") : featCard.modelData.desc
                                             color: window.txtFaint
                                             font.pixelSize: 11
                                             wrapMode: Text.WordWrap
@@ -2612,7 +2595,9 @@ ApplicationWindow {
 
                         // Auto power-off — a choice, not a toggle
                         Card {
-                            visible: controller.hasAutoPowerOff
+                            visible: controller.hasAutoPowerOff || !controller.connected
+                            enabled: controller.connected
+                            opacity: controller.connected ? 1 : 0.62
                             Layout.fillWidth: true
                             Layout.preferredHeight: 112
                             hovered: powerHover.hovered
@@ -2694,11 +2679,12 @@ ApplicationWindow {
                         // frame is verified (WH-1000XM4); the headset cannot report
                         // it, so this shows the saved choice, re-sent on enable.
                         Card {
-                            visible: controller.hasSpeakToChatTimeout
+                            visible: controller.hasSpeakToChatTimeout || !controller.connected
                             Layout.fillWidth: true
                             Layout.columnSpan: 2
                             Layout.preferredHeight: 112
                             enabled: controller.connected
+                            opacity: controller.connected ? 1 : 0.62
                             hovered: s2cHover.hovered
                             HoverHandler { id: s2cHover }
 
@@ -3100,9 +3086,9 @@ ApplicationWindow {
                         }
                     }
 
-                    // Card 2: Menu bar & shortcuts — everything outside the window.
+                    // Card 2: Menu bar — everything outside the window.
                     Card {
-                        visible: window.desk !== null && (window.desk.trayAvailable || window.desk.globalShortcutAvailable)
+                        visible: window.desk !== null && window.desk.trayAvailable
                         Layout.fillWidth: true
                         Layout.preferredHeight: deskCol.implicitHeight + 44
 
@@ -3138,17 +3124,6 @@ ApplicationWindow {
                                 }
                             }
                             SettingRow {
-                                visible: window.desk !== null && window.desk.globalShortcutAvailable
-                                divider: window.desk !== null && window.desk.trayAvailable
-                                glyphPath: window.icons.keyboard
-                                title: window.tr("global_shortcut") + (window.desk ? "  " + window.desk.globalShortcutLabel : "")
-                                desc: window.tr("global_shortcut_desc")
-                                NeoSwitch {
-                                    confirmedChecked: window.desk !== null && window.desk.globalShortcut
-                                    onToggled: window.desk.setGlobalShortcut(checked)
-                                }
-                            }
-                            SettingRow {
                                 visible: window.desk !== null && window.desk.trayAvailable
                                 divider: true
                                 glyphPath: window.icons.bell
@@ -3164,7 +3139,7 @@ ApplicationWindow {
                         }
                     }
 
-                    // Split Cards: About Application & Community/Donate
+                    // About Application
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 18
@@ -3236,30 +3211,6 @@ ApplicationWindow {
 
                                     ColumnLayout {
                                         spacing: 2
-                                        Eyebrow { text: window.tr("about_protocol") }
-                                        Text {
-                                            textFormat: Text.PlainText
-                                            text: "MDR V1 & V2 (C++20)"
-                                            color: window.txt
-                                            font.pixelSize: 12
-                                            font.weight: Font.Medium
-                                        }
-                                    }
-
-                                    ColumnLayout {
-                                        spacing: 2
-                                        Eyebrow { text: window.tr("about_framework") }
-                                        Text {
-                                            textFormat: Text.PlainText
-                                            text: "Qt 6 Quick / QML"
-                                            color: window.txt
-                                            font.pixelSize: 12
-                                            font.weight: Font.Medium
-                                        }
-                                    }
-
-                                    ColumnLayout {
-                                        spacing: 2
                                         Eyebrow { text: window.tr("about_license") }
                                         Text {
                                             textFormat: Text.PlainText
@@ -3268,85 +3219,6 @@ ApplicationWindow {
                                             font.pixelSize: 12
                                             font.weight: Font.Medium
                                         }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Right Card: GitHub & Donate
-                        Card {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 184
-
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 22
-                                spacing: 14
-
-                                RowLayout {
-                                    spacing: 14
-                                    Rectangle {
-                                        Layout.preferredWidth: 42
-                                        Layout.preferredHeight: 42
-                                        radius: 12
-                                        color: Qt.rgba(window.danger.r, window.danger.g, window.danger.b, 0.16)
-                                        border.width: 1
-                                        border.color: Qt.rgba(window.danger.r, window.danger.g, window.danger.b, 0.45)
-
-                                        Glyph {
-                                            anchors.centerIn: parent
-                                            path: window.icons.heart
-                                            size: 20
-                                            color: window.danger
-                                        }
-                                    }
-
-                                    ColumnLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 2
-                                        Text {
-                                            textFormat: Text.PlainText
-                                            text: window.tr("links_support")
-                                            color: window.txt
-                                            font.pixelSize: 15
-                                            font.weight: Font.DemiBold
-                                        }
-                                        Text {
-                                            textFormat: Text.PlainText
-                                            text: window.tr("links_support_sub")
-                                            color: window.txtDim
-                                            font.pixelSize: 12
-                                        }
-                                    }
-                                }
-
-                                Text {
-                                    textFormat: Text.PlainText
-                                    Layout.fillWidth: true
-                                    text: window.tr("donate_desc")
-                                    color: window.txtDim
-                                    font.pixelSize: 12
-                                    wrapMode: Text.WordWrap
-                                    maximumLineCount: 2
-                                    elide: Text.ElideRight
-                                }
-
-                                RowLayout {
-                                    spacing: 10
-
-                                    PillButton {
-                                        compact: true
-                                        glyphPath: window.icons.github
-                                        text: window.tr("btn_github")
-                                        onClicked: controller.openUrl("https://github.com/marconvcm/sony-device-center")
-                                    }
-
-                                    PillButton {
-                                        compact: true
-                                        tint: window.danger
-                                        glyphPath: window.icons.heart
-                                        text: window.tr("btn_donate")
-                                        onClicked: controller.openUrl("https://github.com/sponsors/marconvcm")
                                     }
                                 }
                             }

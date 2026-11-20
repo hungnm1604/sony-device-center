@@ -7,6 +7,8 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QColor>
+#include <QLinearGradient>
 #include <QGuiApplication>
 #include <QFont>
 #include <QFontMetricsF>
@@ -18,6 +20,7 @@
 #include <QPainterPath>
 #include <QPixmap>
 #include <QSettings>
+#include <QTransform>
 #include <QSystemTrayIcon>
 
 namespace sony::devicecenter {
@@ -28,13 +31,13 @@ constexpr int kAlertThresholds[] = {20, 10};
 
 QSettings settings() { return QSettings("SonyBridge", "SonyDeviceCenter"); }
 
-// Menu bar glyph: a wide headphone outline with the battery level set inside
-// the arch (number only: a "%" at this size crowds the cups, and the menu
-// and tooltip spell out "72%"). Drawn as a mask so the menu bar tints it for
-// light, dark and highlighted states. A small bolt under the band marks
-// charging. 25 x 18 pt at every level, so the item never changes width.
+// Menu bar badge: a rounded square in a neutral gray gradient, a dark
+// headphone whose cups carry a light inner outline, and the battery level in
+// large black digits between the cups. A small bolt above
+// the number marks charging. 25 x 19 pt at every level, so the item never
+// changes width and fits the 22 pt menu bar.
 QImage glyphImage(int level, bool charging, int scale) {
-    constexpr qreal W = 25, H = 18, cupW = 3.0, cupH = 7.6, cupY = 9.6, edge = 1.0;
+    constexpr qreal W = 25, H = 19;
     QImage img(int(W * scale), int(H * scale), QImage::Format_ARGB32_Premultiplied);
     img.setDevicePixelRatio(scale);
     // Fixed 96 dpi so point sizes below map to the same pixels on every
@@ -46,37 +49,87 @@ QImage glyphImage(int level, bool charging, int scale) {
     p.setRenderHint(QPainter::Antialiasing);
     p.setRenderHint(QPainter::TextAntialiasing);
 
-    QPainterPath band;
-    band.moveTo(edge + cupW / 2, cupY + 1.0);
-    band.cubicTo(edge + cupW / 2, 0.6, W - edge - cupW / 2, 0.6, W - edge - cupW / 2, cupY + 1.0);
-    p.setPen(QPen(Qt::black, 1.5, Qt::SolidLine, Qt::RoundCap));
-    p.drawPath(band);
-    p.setPen(Qt::NoPen);
-    p.setBrush(Qt::black);
-    p.drawRoundedRect(QRectF(edge, cupY, cupW, cupH), 1.5, 1.5);
-    p.drawRoundedRect(QRectF(W - edge - cupW, cupY, cupW, cupH), 1.5, 1.5);
+    const QRectF tile(0.5, 0.5, W - 1.0, H - 1.0);
+    QPainterPath shape;
+    shape.addRoundedRect(tile, 4.6, 4.6);
+    p.save();
+    p.setClipPath(shape);
+    // Neutral gray, so the badge sits quietly among the system items.
+    QLinearGradient body(0, 0, 0, H);
+    body.setColorAt(0, QColor("#D5D8DD"));
+    body.setColorAt(1, QColor("#A3A8B0"));
+    p.fillRect(tile, body);
+    p.restore();
+    p.setPen(QPen(QColor(0, 0, 0, 40), 0.5));                     // edge on light bars
+    p.setBrush(Qt::NoBrush);
+    p.drawPath(shape);
 
-    if (level >= 0) {
-        QFont f = QGuiApplication::font();
-        f.setWeight(QFont::Bold);
-        // Point sizes on a 96-dpi QImage: 0.75 pt per logical pixel.
-        f.setPointSizeF((level >= 100 ? 7.6 : 9.0) * 0.75);
-        f.setLetterSpacing(QFont::AbsoluteSpacing, -0.2);
-        const QString text = QString::number(std::clamp(level, 0, 100));
-        const QFontMetricsF fm(f);
-        p.setFont(f);
-        p.setPen(Qt::black);
-        p.drawText(QPointF((W - fm.horizontalAdvance(text)) / 2, cupY + cupH - 0.3), text);
-    }
-    if (charging) {
-        constexpr qreal bx = W / 2, by = 3.0;
-        QPainterPath bolt;
-        bolt.moveTo(bx + 0.9, by - 0.4); bolt.lineTo(bx - 2.0, by + 3.0); bolt.lineTo(bx - 0.1, by + 3.0);
-        bolt.lineTo(bx - 0.9, by + 5.6); bolt.lineTo(bx + 2.0, by + 2.1); bolt.lineTo(bx + 0.1, by + 2.1);
-        bolt.closeSubpath();
+    const QColor ink("#3A3C41");   // dark headphone on the gray body
+    QPainterPath band;
+    // Raised 1.4 pt so the number below the band has room between the cups.
+    band.moveTo(2.6, 9.6);
+    band.cubicTo(2.6, 0.6, W - 2.6, 0.6, W - 2.6, 9.6);
+    p.setPen(QPen(ink, 2.1, Qt::SolidLine, Qt::FlatCap));
+    p.drawPath(band);
+
+    // Cups: tilted capsules with a white inner line, as in the reference.
+    auto cup = [&](qreal cx, qreal angle) {
+        p.save();
+        p.translate(cx, 11.9);
+        p.rotate(angle);
         p.setPen(Qt::NoPen);
-        p.setBrush(Qt::black);
+        p.setBrush(ink);
+        p.drawRoundedRect(QRectF(-1.7, -4.3, 3.4, 8.6), 1.7, 1.7);
+        p.setPen(QPen(QColor("#F4F7F9"), 0.65));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(QRectF(-0.6, -3.0, 1.2, 6.0), 0.6, 0.6);
+        p.restore();
+    };
+    cup(3.1, -7);
+    cup(W - 3.1, 7);
+
+    if (charging) {
+        constexpr qreal bx = W / 2, by = 1.6;
+        QPainterPath bolt;
+        bolt.moveTo(bx + 0.7, by - 0.4); bolt.lineTo(bx - 1.5, by + 2.3); bolt.lineTo(bx - 0.1, by + 2.3);
+        bolt.lineTo(bx - 0.7, by + 4.4); bolt.lineTo(bx + 1.5, by + 1.6); bolt.lineTo(bx + 0.1, by + 1.6);
+        bolt.closeSubpath();
+        // Amber with a dark rim: it sits on the dark band, so neither plain
+        // white nor the ink colour would show.
+        p.setPen(QPen(ink, 0.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.setBrush(QColor("#FFC93C"));
         p.drawPath(bolt);
+    }
+    if (level >= 0) {
+        // Avenir Next is on every Mac; the fallbacks keep other platforms sane.
+        QFont f = QGuiApplication::font();
+        f.setFamilies({"Avenir Next", "Helvetica Neue", f.family()});
+        f.setWeight(QFont::Bold);
+        // Number only: a "%" at this size crowds the cups; the menu and
+        // tooltip spell out "72%". Point sizes are 0.75 pt per logical pixel.
+        const int clamped = std::clamp(level, 0, 100);
+        const QString text = QString::number(clamped);
+        f.setPointSizeF((clamped >= 100 ? 8.2 : 11.0) * 0.75);
+        f.setLetterSpacing(QFont::AbsoluteSpacing, clamped >= 100 ? -0.3 : 0.0);
+        // Centred on the badge, both ways, and stretched taller than the
+        // font draws it: the space between the cups is narrow but tall.
+        QPainterPath digits;
+        digits.addText(0, 0, f, text);
+        const QRectF r = digits.boundingRect();
+        QTransform t;
+        t.translate(W / 2, H / 2 + (charging ? 2.2 : 0.6));
+        t.scale(1.0, 1.3);
+        t.translate(-r.center().x(), -r.center().y());
+        digits = t.map(digits);
+        // Near-black on the gray body, dark red when low. A thin pale rim,
+        // drawn first and then covered by the fill, separates the digits
+        // from the dark cups and keeps the counters of 0, 6, 8 and 9 open.
+        p.setBrush(Qt::NoBrush);
+        p.setPen(QPen(QColor(255, 255, 255, 235), 0.9, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.drawPath(digits);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(clamped <= 20 ? "#B3170F" : "#0B0C0F"));
+        p.drawPath(digits);
     }
     p.end();
     return img;
@@ -85,7 +138,6 @@ QImage glyphImage(int level, bool charging, int scale) {
 QIcon trayGlyph() {
     QIcon icon;
     for (int scale : {1, 2}) icon.addPixmap(QPixmap::fromImage(glyphImage(-1, false, scale)));
-    icon.setIsMask(true);
     return icon;
 }
 
@@ -102,7 +154,9 @@ DesktopIntegration::DesktopIntegration(DeviceCenterController* controller, QObje
     : QObject(parent), _controller(controller), _native(std::make_unique<Native>()) {
     auto s = settings();
     _menuBarIcon = s.value("menuBarIcon", true).toBool();
-    _globalShortcut = s.value("globalShortcut", true).toBool();
+    // The global shortcut is not offered in Settings any more; keep it off
+    // even if an older build saved it as enabled.
+    _globalShortcut = false;
     _batteryAlerts = s.value("batteryAlerts", true).toBool();
     _menuBarPercent = s.value("menuBarPercent", true).toBool();
 
@@ -265,8 +319,7 @@ void DesktopIntegration::_refreshTray() {
     if (_native->statusItem) {
         const bool charging = connected && c->isCharging();
         const int level = (_menuBarPercent && connected) ? battery : -1;
-        // Redraw only when the number or the bolt changes; the title stays
-        // empty because the level is part of the glyph.
+        // Redraw only when the number or the bolt changes.
         const QString key = QString::number(level) + (charging ? "c" : "");
         const bool changed = key != _native->lastGlyphKey;
         native::updateStatusItem(_native->statusItem, changed ? glyphImage(level, charging, 2) : QImage(), QString(), toolTip);

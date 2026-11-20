@@ -71,15 +71,18 @@ struct DeviceCapabilities
     // documented; V2 keeps its device default until a capture confirms it.
     bool speakToChatTimeout = false;
 
-    // Remote power off. V2 POWER_SET `24 03 01` (layout from Gadgetbridge's
-    // SonyProtocolImplV2.powerOff). Enabled per model only once that model
-    // is named here; V1 0x22 is never sent by this path.
+    // Remote power off, sent in the frame of the model's own generation:
+    // V2 (XM5, XM6) POWER_SET `24 03 01`, from Gadgetbridge's
+    // SonyProtocolImplV2.powerOff; V1 (XM4) opcode 0x22, `22 00`. Enabled
+    // per model only once that model is named here, and only ever sent
+    // from the Turn Off action, never on connect.
     bool powerOff = false;
 
     // Auto power off is only Off / "when taken off" (indices 0 and 5 of the
-    // APO table); the timed codes are not supported. Gadgetbridge declares
-    // only AutomaticPowerOffWhenTakenOff for the WH-1000XM5, and an XM5 on
-    // firmware 2.5.1 answered a written 5-minute code (00 00) with 10 00.
+    // APO table); the timed codes are not offered. Set for the WH-1000XM5:
+    // on firmware 2.5.1 every timed code (5 min, 30 min, 1 h, 3 h) was
+    // stored as "when taken off" (10 00), confirmed on hardware through the
+    // readback in SonyDevice::setAutoPowerOff.
     bool autoPowerOffTakenOffOnly = false;
 };
 

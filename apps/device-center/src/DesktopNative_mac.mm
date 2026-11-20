@@ -80,7 +80,7 @@ void updateStatusItem(Handle handle, const QImage& glyph, const QString& title, 
         const qreal dpr = glyph.devicePixelRatio() > 0 ? glyph.devicePixelRatio() : 1.0;
         NSImage* image = [[NSImage alloc] initWithCGImage:cg size:NSMakeSize(glyph.width() / dpr, glyph.height() / dpr)];
         CGImageRelease(cg);
-        [image setTemplate:YES];  // ("template" is a C++ keyword) the menu bar tints it for light, dark and highlighted states
+        [image setTemplate:NO];  // Full-colour badge (see glyphImage); a template would flatten it to one tint.
         item.button.image = image;
         [image release];
     }

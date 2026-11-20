@@ -64,7 +64,8 @@ const std::vector<DeviceProfile>& getStaticProfiles() {
                 .codecInfo = true,
                 .wearSensor = true,
                 .multipoint = true,
-                .speakToChatTimeout = true
+                .speakToChatTimeout = true,
+                .powerOff = true
             }
         },
         // WH-1000XM5 (V2 protocol, Full capability set)
@@ -114,7 +115,8 @@ const std::vector<DeviceProfile>& getStaticProfiles() {
                 .firmwareInfo = true,
                 .codecInfo = true,
                 .wearSensor = true,
-                .multipoint = true
+                .multipoint = true,
+                .powerOff = true
             }
         },
         // WF-1000XM4 (V2 protocol, TWS dual battery + case, speak to chat, wear sensor)

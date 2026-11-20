@@ -314,12 +314,28 @@ void SonyDevice::setDsee(bool enabled) {
 void SonyDevice::setAutoPowerOff(int index) {
     if (!_protocol) return;
     _protocol->setAutoPowerOff(index);
+    // Read the value back: some firmware stores a different code than the one
+    // written. If the read itself fails the write is kept as the best
+    // knowledge, as before.
+    int stored = index;
+    try {
+        stored = _protocol->getAutoPowerOff();
+    } catch (const SonyException& ex) {
+        if (ex.code() == SonyErrorCode::Disconnected) throw;
+    }
     {
         std::lock_guard lock(_stateMutex);
-        _state.autoPowerOff = index;
+        _state.autoPowerOff = stored;
         _markSuccess("autoPowerOff");
     }
     _dispatcher.dispatch(protocol::DeviceStateChanged{snapshot()});
+    if (stored != index) {
+        static const char* const kNames[] = {"Off", "5 minutes", "30 minutes", "1 hour", "3 hours", "When taken off"};
+        auto name = [](int i) { return (i >= 0 && i < 6) ? kNames[i] : "an unknown setting"; };
+        throw SonyException(SonyErrorCode::InvalidResponse,
+            std::string("The headphones did not accept this setting. They now report: ") + name(stored) +
+            " (requested: " + name(index) + ")");
+    }
 }
 
 void SonyDevice::powerOff() {

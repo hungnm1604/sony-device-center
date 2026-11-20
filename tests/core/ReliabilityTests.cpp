@@ -250,23 +250,65 @@ TEST_CASE("Speak-to-Chat timeout is offered and range-checked only on WH-1000XM4
 TEST_CASE("Remote power off is offered only where its frame is known", "[core][json][power]") {
     auto transport = std::make_shared<ReplyTransport>();
     DeviceService service(transport);
-    service.connect(DeviceAddress("11:22:33:44:55:66"), "WH-1000XM4");
+    for (const char* name : {"WH-1000XM4", "WH-1000XM5", "WH-1000XM6"}) {
+        service.connect(DeviceAddress("11:22:33:44:55:66"), name);
+        CHECK(JsonProtocol::snapshot(service)["capabilities"]["powerOff"] == true);
+        service.disconnect();
+    }
+    // Unlisted models fall back to V1 with no capabilities and must refuse.
+    service.connect(DeviceAddress("11:22:33:44:55:66"), "WH-1000XM3");
     CHECK(JsonProtocol::snapshot(service)["capabilities"]["powerOff"] == false);
     CHECK(JsonProtocol::execute({{"version",1},{"id",1},{"method","powerOff"}}, service)["error"]["code"] == "Unsupported");
     service.disconnect();
-    service.connect(DeviceAddress("11:22:33:44:55:66"), "WH-1000XM5");
-    CHECK(JsonProtocol::snapshot(service)["capabilities"]["powerOff"] == true);
-    service.disconnect();
 }
+
+namespace {
+// Answers the auto power-off inquiry (26 05) with a fixed code pair, as a
+// headset that echoes the written value or one that rewrites it would.
+class ApoReplyTransport : public ReplyTransport {
+public:
+    uint8_t c0{0x00}, c1{0x00};
+    size_t send(std::span<const std::byte> data) override {
+        const auto count = ReplyTransport::send(data);
+        std::vector<uint8_t> bytes;
+        for (auto b : data) bytes.push_back(static_cast<uint8_t>(b));
+        auto frame = sony::protocol::FrameCodec::decode(bytes);
+        if (frame.type == sony::protocol::DataType::DataMdr && frame.payload.size() >= 2 &&
+            frame.payload[0] == 0x26 && frame.payload[1] == 0x05)
+            notify({0x27, 0x05, c0, c1});
+        return count;
+    }
+};
+} // namespace
 
 TEST_CASE("WH-1000XM5 auto power off accepts only Off or When taken off", "[core][json][apo]") {
     auto transport = std::make_shared<ReplyTransport>();
     DeviceService service(transport);
     service.connect(DeviceAddress("11:22:33:44:55:66"), "WH-1000XM5");
     CHECK(JsonProtocol::snapshot(service)["capabilities"]["autoPowerOffMode"] == "takenOff");
-    // Index 1 is the 5-minute code 00 00, which an XM5 stores as "when taken off".
-    CHECK(JsonProtocol::execute({{"version",1},{"id",1},{"method","autoPowerOff"},{"params",{{"index",1}}}}, service)["error"]["code"] == "InvalidRequest");
-    auto text = IpcProtocol::execute(IpcProtocol::parseCommand("apo 2"), service);
-    CHECK_FALSE(text.success);
+    // Every timed code was stored as "when taken off" on a real XM5 (fw 2.5.1).
+    for (int index : {1, 2, 3, 4})
+        CHECK(JsonProtocol::execute({{"version",1},{"id",1},{"method","autoPowerOff"},{"params",{{"index",index}}}}, service)["error"]["code"] == "InvalidRequest");
+    CHECK_FALSE(IpcProtocol::execute(IpcProtocol::parseCommand("apo 2"), service).success);
+    service.disconnect();
+}
+
+TEST_CASE("A timed auto power-off write is verified by readback", "[core][json][apo]") {
+    auto transport = std::make_shared<ApoReplyTransport>();
+    DeviceService service(transport);
+    service.connect(DeviceAddress("11:22:33:44:55:66"), "WH-1000XM6");
+    CHECK(JsonProtocol::snapshot(service)["capabilities"]["autoPowerOffMode"] == "timed");
+    auto apo = [&](int index) {
+        return JsonProtocol::execute({{"version",1},{"id",1},{"method","autoPowerOff"},{"params",{{"index",index}}}}, service);
+    };
+    // Headset echoes the 30-minute code (01 01): accepted and reported as index 2.
+    transport->c0 = 0x01; transport->c1 = 0x01;
+    CHECK(apo(2)["ok"] == true);
+    CHECK(service.snapshot()->autoPowerOff == 2);
+    // Headset rewrites a 5-minute write (00 00) to "when taken off" (10 00):
+    // the request is reported as failed and the state shows what it kept.
+    transport->c0 = 0x10; transport->c1 = 0x00;
+    CHECK(apo(1)["ok"] == false);
+    CHECK(service.snapshot()->autoPowerOff == 5);
     service.disconnect();
 }

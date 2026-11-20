@@ -4,8 +4,8 @@
 
   <defs>
     <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0"   stop-color="#A78BFA"/>
-      <stop offset="1"   stop-color="#7C5CFF"/>
+      <stop offset="0"   stop-color="#3FA8FF"/>
+      <stop offset="1"   stop-color="#0A6CFF"/>
     </linearGradient>
     <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0"   stop-color="#FFFFFF" stop-opacity="0.16"/>

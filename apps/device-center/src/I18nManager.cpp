@@ -153,7 +153,7 @@ void I18nManager::_initTranslations() {
     en["apo_unreadable"]      = "Couldn't read this setting from the headphones.";
     en["power_off_named"]     = "Turn Off %1";
     en["menubar_percent"]     = "Show Battery Percentage";
-    en["menubar_percent_desc"] = "Shown inside the menu bar headphones.";
+    en["menubar_percent_desc"] = "Shown inside the menu bar headphone icon.";
     en["connected_to_mac"]    = "Connected to this Mac";
     en["paired"]              = "Paired";
     en["no_devices_found"]    = "No Sony headphones found. Pair them in Bluetooth Settings first.";
@@ -603,7 +603,7 @@ void I18nManager::_initTranslations() {
     de["apo_unreadable"]      = "Diese Einstellung konnte nicht gelesen werden.";
     de["power_off_named"]     = "%1 ausschalten";
     de["menubar_percent"]     = "Akkustand in Prozent";
-    de["menubar_percent_desc"] = "Wird im Kopfhörersymbol der Menüleiste angezeigt.";
+    de["menubar_percent_desc"] = "Wird im Kopfhörersymbol in der Menüleiste angezeigt.";
     de["connected_to_mac"]    = "Mit diesem Mac verbunden";
     de["paired"]              = "Gekoppelt";
     de["no_devices_found"]    = "Keine Sony-Kopfhörer gefunden. Zuerst in den Bluetooth-Einstellungen koppeln.";
@@ -753,7 +753,7 @@ void I18nManager::_initTranslations() {
     fr["apo_unreadable"]      = "Impossible de lire ce réglage du casque.";
     fr["power_off_named"]     = "Éteindre %1";
     fr["menubar_percent"]     = "Afficher le pourcentage";
-    fr["menubar_percent_desc"] = "Affiché à l'intérieur de l'icône du casque dans la barre des menus.";
+    fr["menubar_percent_desc"] = "Affiché dans l'icône du casque dans la barre des menus.";
     fr["connected_to_mac"]    = "Connecté à ce Mac";
     fr["paired"]              = "Associé";
     fr["no_devices_found"]    = "Aucun casque Sony trouvé. Associez-le d'abord dans les réglages Bluetooth.";

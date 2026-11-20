@@ -254,6 +254,14 @@ void ProtocolV1::setAutoPowerOff(int /*index*/) {
     throw SonyException(SonyErrorCode::Unsupported, "Auto Power Off is not supported on Protocol V1");
 }
 
+void ProtocolV1::powerOff() {
+    // Opcode 0x22 is POWER OFF on this generation. The frame is `22 00`: the
+    // V2 battery request, which powered WH-1000XM4 units off when it was sent
+    // to them by mistake (see the e630f1e / ae55225 history). The headset
+    // drops the link without replying; SonyDevice treats that as success.
+    _session.send(SonyFrame{ .type = DataType::DataMdr, .payload = {0x22, 0x00} });
+}
+
 bool ProtocolV1::getSpeakToChat() {
     // GET f6 05 -> RET f7 05 <kind> <onOff>
     // kind 0x02 is an active talking session (cans ducked). That is still

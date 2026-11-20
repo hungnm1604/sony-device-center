@@ -38,6 +38,9 @@ public:
 
     int getAutoPowerOff() override;
     void setAutoPowerOff(int index) override;
+    // Only ever called from an explicit user action on a model whose profile
+    // sets `powerOff`; nothing in connect/refresh reaches it.
+    void powerOff() override;
 
     bool getSpeakToChat() override;
     void setSpeakToChat(bool enabled) override;
