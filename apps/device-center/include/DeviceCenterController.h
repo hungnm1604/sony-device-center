@@ -5,11 +5,13 @@
 #include <QJsonObject>
 #include <QString>
 #include <QVariantList>
+#include <QUrl>
 #include <memory>
 #include <string>
 
 #include "sony/core/IDeviceService.h"
 #include "sony/core/IpcClient.h"
+#include "BatteryHistoryStore.h"
 
 namespace sony::devicecenter {
 
@@ -34,6 +36,14 @@ class DeviceCenterController : public QObject {
     Q_PROPERTY(int batteryCase READ batteryCase NOTIFY stateChanged)
     Q_PROPERTY(bool isCharging READ isCharging NOTIFY stateChanged)
     Q_PROPERTY(QString noiseControlMode READ noiseControlMode NOTIFY stateChanged)
+    Q_PROPERTY(int estimatedFullMinutes READ estimatedFullMinutes NOTIFY batteryHistoryChanged)
+    Q_PROPERTY(int estimatedRemainingMinutes READ estimatedRemainingMinutes NOTIFY batteryHistoryChanged)
+    Q_PROPERTY(QString estimateSource READ estimateSource NOTIFY batteryHistoryChanged)
+    Q_PROPERTY(int estimateSampleDays READ estimateSampleDays NOTIFY batteryHistoryChanged)
+    Q_PROPERTY(QVariantList batteryHistoryDays READ batteryHistoryDays NOTIFY batteryHistoryChanged)
+    Q_PROPERTY(QVariantList batteryTrend READ batteryTrend NOTIFY batteryHistoryChanged)
+    Q_PROPERTY(double batteryHealth READ batteryHealth NOTIFY batteryHistoryChanged)
+    Q_PROPERTY(double specFullHours READ specFullHours NOTIFY batteryHistoryChanged)
     Q_PROPERTY(int ambientLevel READ ambientLevel NOTIFY stateChanged)
     Q_PROPERTY(bool focusOnVoice READ focusOnVoice NOTIFY stateChanged)
     Q_PROPERTY(int equalizerPreset READ equalizerPreset NOTIFY stateChanged)
@@ -93,6 +103,14 @@ public:
     int batteryCase() const { return _batteryCase; }
     [[nodiscard]] bool isCharging() const;
     [[nodiscard]] QString noiseControlMode() const;
+    int estimatedFullMinutes() const { return _estimatedFullMinutes; }
+    int estimatedRemainingMinutes() const { return _estimatedRemainingMinutes; }
+    QString estimateSource() const { return _estimateSource; }
+    int estimateSampleDays() const { return _estimateSampleDays; }
+    QVariantList batteryHistoryDays() const { return _batteryHistoryDays; }
+    QVariantList batteryTrend() const { return _batteryTrend; }
+    double batteryHealth() const { return _batteryHealth; }
+    double specFullHours() const { return _specFullHours; }
     [[nodiscard]] int ambientLevel() const;
     [[nodiscard]] bool focusOnVoice() const;
     [[nodiscard]] int equalizerPreset() const;
@@ -149,6 +167,9 @@ public:
     Q_INVOKABLE void connectDevice(const QString& address, const QString& name = "");
     Q_INVOKABLE void disconnectDevice();
     Q_INVOKABLE void refreshDiscoveredDevices();
+    Q_INVOKABLE void clearBatteryHistory();
+    Q_INVOKABLE bool exportBatteryHistory(const QUrl& path);
+    Q_INVOKABLE bool exportBatteryHistoryWithDialog();
 
 signals:
     void stateChanged();
@@ -158,11 +179,16 @@ signals:
     void languageChanged();
     void themeChanged();
     void speakToChatTimeoutChanged();
+    void batteryHistoryChanged();
 
 private:
     void _applySnapshot(const QByteArray& data);
+    void _recomputeBatteryHistory();
+    void _resetBatteryEstimate();
+    int _effectiveBatteryLevel() const;
     void _send(const QString& method, const QJsonObject& params = {});
     QThread _worker;
+    std::unique_ptr<BatteryHistoryStore> _batteryHistory;
     DeviceBackend* _backend{nullptr};
     quint64 _generation{0};
     bool _busy{true};
@@ -173,6 +199,13 @@ private:
     // Cached UI state
     QString _deviceName{""};
     QString _deviceAddress{""};
+    QString _batteryHistoryAddress;
+    int _estimatedFullMinutes{-1}, _estimatedRemainingMinutes{-1}, _estimateSampleDays{-1};
+    QString _estimateSource{"none"};
+    QVariantList _batteryHistoryDays, _batteryTrend;
+    double _batteryHealth{-1.0};
+    double _specFullHours{-1.0};
+    bool _batteryHistoryLoaded{false};
     bool _connected{false};
     int _batteryLevel{-1};
     int _batteryLeft{-1}, _batteryRight{-1}, _batteryCase{-1};

@@ -29,9 +29,11 @@ endif()
 add_executable(sony-device-center
     main.cpp
     src/DeviceCenterController.cpp
+    src/BatteryHistoryStore.cpp
     src/DeviceBackend.cpp
     include/DeviceBackend.h
     include/DeviceCenterController.h
+    include/BatteryHistoryStore.h
     src/I18nManager.cpp
     include/I18nManager.h
     src/DesktopIntegration.cpp
@@ -158,13 +160,22 @@ if(BUILD_TESTING)
         add_executable(sony-ui-tests
             ../../tests/ui/DeviceControllerTests.cpp
             src/DeviceCenterController.cpp include/DeviceCenterController.h
+            src/BatteryHistoryStore.cpp include/BatteryHistoryStore.h
             src/DeviceBackend.cpp include/DeviceBackend.h
             src/I18nManager.cpp include/I18nManager.h)
         target_include_directories(sony-ui-tests PRIVATE include)
         target_compile_definitions(sony-ui-tests PRIVATE SONY_DEVICE_CENTER_VERSION="${SonyDeviceCenter_VERSION}")
-        target_link_libraries(sony-ui-tests PRIVATE Qt6::Test Qt6::Gui sony-core)
+        target_link_libraries(sony-ui-tests PRIVATE Qt6::Test Qt6::Gui Qt6::Widgets sony-core)
         add_test(NAME "device-controller-worker-integration" COMMAND sony-ui-tests)
         set_tests_properties("device-controller-worker-integration" PROPERTIES TIMEOUT 25)
+
+        add_executable(battery-history-store-tests
+            ../../tests/ui/BatteryHistoryStoreTests.cpp
+            src/BatteryHistoryStore.cpp include/BatteryHistoryStore.h)
+        target_include_directories(battery-history-store-tests PRIVATE include)
+        target_link_libraries(battery-history-store-tests PRIVATE Qt6::Test Qt6::Core sony-core)
+        add_test(NAME battery-history-store COMMAND battery-history-store-tests)
+        set_tests_properties(battery-history-store PROPERTIES TIMEOUT 25)
     endif()
 endif()
 

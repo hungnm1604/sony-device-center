@@ -80,6 +80,7 @@ target_link_libraries(sony-transport-tests PRIVATE Catch2::Catch2WithMain Thread
 catch_discover_tests(sony-transport-tests PROPERTIES TIMEOUT 10)
 
 add_executable(sony-core-tests
+    core/BatteryHistoryTests.cpp
     core/SonyDeviceTests.cpp
     core/IpcProtocolTests.cpp
     core/ReliabilityTests.cpp

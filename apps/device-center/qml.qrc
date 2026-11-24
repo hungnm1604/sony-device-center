@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file>qml/Main.qml</file>
+        <file>qml/BatteryHistoryChart.qml</file>
         <file alias="resources/brand/mark.svg">../../assets/mark.svg</file>
         <file alias="resources/brand/lockup.svg">../../assets/lockup.svg</file>
         <file alias="resources/brand/app-icon.svg">../../assets/app-icon.svg</file>

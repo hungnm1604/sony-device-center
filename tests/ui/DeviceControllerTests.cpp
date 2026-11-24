@@ -5,6 +5,7 @@
 #include "../support/ReplyTransport.h"
 #include <chrono>
 #include <condition_variable>
+#include <QStandardPaths>
 using namespace sony;
 using namespace sony::devicecenter;
 class SlowService : public core::IDeviceService {
@@ -38,6 +39,7 @@ public:
 class DeviceControllerTests : public QObject {
     Q_OBJECT
 private slots:
+    void initTestCase() { QStandardPaths::setTestModeEnabled(true); }
     void twsBatteryReadingsAreExposedAndCleared() {
         auto transport = std::make_shared<ReplyTransport>();
         auto service = std::make_shared<core::DeviceService>(transport);
@@ -83,6 +85,19 @@ private slots:
         QCOMPARE(controller.batteryLevel(), -1);
         QCOMPARE(controller.noiseControlMode(), QString("unknown"));
         QCOMPARE(controller.codec(), QString("Unknown"));
+    }
+    void batteryEstimateUsesXm5SpecPrior() {
+        auto transport = std::make_shared<ReplyTransport>();
+        auto service = std::make_shared<core::DeviceService>(transport);
+        service->connect(transport::DeviceAddress("22:33:44:55:66:77"), "WH-1000XM5");
+        DeviceCenterController controller(nullptr, service);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(controller.estimateSource(), QString("spec"), 2000);
+        QCOMPARE(controller.estimatedFullMinutes(), 1620);
+        QCOMPARE(controller.estimatedRemainingMinutes(), 1350); // fixture reports 85%; 75% of 27 h remains to 10%.
+        transport->notify({0x23, 0x00, 85, 1});
+        QTRY_VERIFY_WITH_TIMEOUT(controller.isCharging(), 1000);
+        QCOMPARE(controller.estimatedRemainingMinutes(), -1);
     }
     void equalizerCapabilities_data() {
         QTest::addColumn<QString>("model");

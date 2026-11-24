@@ -14,6 +14,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QFileDialog>
 #include <QGuiApplication>
 #include <QSettings>
 #include <QStyleHints>
@@ -22,6 +23,9 @@
 #include <QTextStream>
 #include <QUrl>
 #include <QVariantMap>
+#include <QDateTime>
+#include <QDate>
+#include <QRegularExpression>
 #include <algorithm>
 #include <sstream>
 
@@ -37,6 +41,12 @@ QString normalizedTheme(const QString& id) {
 
 DeviceCenterController::DeviceCenterController(QObject* parent, std::shared_ptr<core::IDeviceService> service)
     : QObject(parent) {
+    _batteryHistory = std::make_unique<BatteryHistoryStore>();
+    connect(_batteryHistory.get(), &BatteryHistoryStore::historyLoaded, this, [this](const QString& address) {
+        if (address != _deviceAddress || address != _batteryHistoryAddress) return;
+        _batteryHistoryLoaded = true;
+        _recomputeBatteryHistory();
+    });
     QSettings settings("SonyBridge", "SonyDeviceCenter");
     _currentLanguage = settings.value("language", "en").toString();
     _theme = normalizedTheme(settings.value("theme", "midnight").toString());
@@ -69,6 +79,7 @@ DeviceCenterController::~DeviceCenterController() {
     // stop request and the worker observing it. No GUI events are re-entered.
     while (!stopped.tryAcquire(1, 20)) _backend->cancelPending();
     _worker.quit(); _worker.wait();
+    _batteryHistory.reset();
 }
 void DeviceCenterController::_send(const QString& method, const QJsonObject& params) {
     if (_busy && method != "disconnect") return;
@@ -80,13 +91,28 @@ void DeviceCenterController::_send(const QString& method, const QJsonObject& par
 }
 void DeviceCenterController::_applySnapshot(const QByteArray& data) {
     const auto s = QJsonDocument::fromJson(data).object();
+    const auto oldAddress = _deviceAddress;
+    const auto oldName = _deviceName;
+    const auto oldConnected = _connected;
+    const auto oldLevel = _batteryLevel;
+    const auto oldCharging = _isCharging;
+    const auto oldMode = _noiseControlMode;
     _connected = s.value("connected").toBool();
     _connectionState = s.value("connectionState").toString("disconnected");
     if (s.contains("name")) _deviceName = s.value("name").toString();
     if (s.contains("address")) _deviceAddress = s.value("address").toString();
+    if (!_deviceAddress.isEmpty() && _deviceAddress != _batteryHistoryAddress) {
+        _batteryHistoryAddress = _deviceAddress;
+        _batteryHistoryLoaded = false;
+        _resetBatteryEstimate();
+        _batteryHistory->loadHistory(_deviceAddress);
+    }
     if (!s.contains("features")) {
         _batteryLevel = -1; _noiseControlMode = "unknown";
         _batteryLeft = _batteryRight = _batteryCase = -1;
+        int added = 0;
+        if (!_deviceAddress.isEmpty()) added = _batteryHistory->feed(_deviceAddress, _connected, -1, _isCharging, _noiseControlMode, _codec);
+        if (added || oldAddress != _deviceAddress || oldName != _deviceName || oldConnected != _connected || oldLevel != _batteryLevel || oldCharging != _isCharging || oldMode != _noiseControlMode) _recomputeBatteryHistory();
         emit stateChanged(); return;
     }
     _features = s.value("features").toObject().toVariantMap();
@@ -110,8 +136,12 @@ void DeviceCenterController::_applySnapshot(const QByteArray& data) {
     _dsee = s.value("dsee").toBool(); _speakToChat = s.value("speakToChat").toBool();
     _adaptiveVolume = s.value("adaptiveVolume").toBool(); _autoPowerOff = s.value("autoPowerOff").toInt();
     _codec = _connected && valid("codec") ? s.value("codec").toString("Unknown") : "Unknown";
+    const int historyLevel = _effectiveBatteryLevel();
+    const int added = !_deviceAddress.isEmpty() ? _batteryHistory->feed(_deviceAddress, _connected, historyLevel, _isCharging, _noiseControlMode, _codec) : 0;
     _firmware = _connected && valid("firmware") ? s.value("firmware").toString() : QString();
     if (_firmware == QLatin1String("Unknown")) _firmware.clear();
+    if (_deviceAddress.isEmpty()) _resetBatteryEstimate();
+    else if (added || oldAddress != _deviceAddress || oldName != _deviceName || oldConnected != _connected || oldLevel != _batteryLevel || oldCharging != _isCharging || oldMode != _noiseControlMode) _recomputeBatteryHistory();
     emit stateChanged(); emit capabilitiesChanged();
 }
 
@@ -121,6 +151,70 @@ bool DeviceCenterController::isConnected() const { return _connected; }
 int DeviceCenterController::batteryLevel() const { return _batteryLevel; }
 bool DeviceCenterController::isCharging() const { return _isCharging; }
 QString DeviceCenterController::noiseControlMode() const { return _noiseControlMode; }
+int DeviceCenterController::_effectiveBatteryLevel() const {
+    if (_batteryLevel >= 0) return _batteryLevel;
+    if (_batteryLeft >= 0 && _batteryRight >= 0) return std::min(_batteryLeft, _batteryRight);
+    if (_batteryLeft >= 0) return _batteryLeft;
+    return _batteryRight;
+}
+void DeviceCenterController::_resetBatteryEstimate() {
+    _estimatedFullMinutes = _estimatedRemainingMinutes = -1;
+    _estimateSource = "none"; _estimateSampleDays = -1;
+    _specFullHours = -1.0;
+    _batteryHistoryDays.clear(); _batteryTrend.clear(); _batteryHealth = -1.0;
+    emit batteryHistoryChanged();
+}
+
+void DeviceCenterController::_recomputeBatteryHistory() {
+    if (_deviceAddress.isEmpty()) { _resetBatteryEstimate(); return; }
+    if (!_batteryHistoryLoaded || _batteryHistoryAddress != _deviceAddress) return;
+    using namespace sony::core::battery;
+    const auto history = _batteryHistory->events(_deviceAddress);
+    const auto intervals = extractIntervals(history);
+    const auto now = QDateTime::currentMSecsSinceEpoch();
+    const auto model = protocol::DeviceProfileRegistry::identifyModel(_deviceName.toStdString());
+    const auto prior = sony::core::battery::specFullHours(model, _noiseControlMode == "cancelling" || _noiseControlMode == "noiseCancelling");
+    _specFullHours = prior ? *prior * 0.9 : -1.0;
+    const auto estimate = currentEstimate(intervals, now, prior);
+    auto roundMinutes = [](double hours) { return static_cast<int>(std::lround(hours * 60.0 / 30.0) * 30); };
+    const auto full = fullChargeHours(estimate);
+    const auto remaining = (_isCharging || _effectiveBatteryLevel() < 0) ? std::optional<double>{} : remainingHours(estimate, _effectiveBatteryLevel());
+    _estimatedFullMinutes = full ? roundMinutes(*full) : -1;
+    _estimatedRemainingMinutes = remaining ? roundMinutes(*remaining) : -1;
+    _estimateSource = estimate.source == Estimate::Measured ? "measured" : estimate.source == Estimate::Spec ? "spec" : "none";
+    _estimateSampleDays = estimate.sampleDays;
+    const auto offset = [](std::int64_t ms) { return QDateTime::fromMSecsSinceEpoch(ms).offsetFromUtc(); };
+    _batteryHistoryDays.clear();
+    for (const auto& day : aggregateDays(intervals, offset)) _batteryHistoryDays.append(QVariantMap{{"date", QString::fromStdString(day.date)}, {"fullHours", day.fullHours}, {"hours", day.hours}, {"ancShare", day.ancShare}, {"valid", day.valid}});
+    _batteryTrend.clear();
+    for (const auto& point : rollingTrend(intervals, offset)) _batteryTrend.append(QVariantMap{{"date", QString::fromStdString(point.date)}, {"fullHours", point.fullHours}});
+    const auto health = healthRatio(intervals, now, offset); _batteryHealth = health ? *health : -1.0;
+    emit batteryHistoryChanged();
+}
+
+void DeviceCenterController::clearBatteryHistory() {
+    if (_deviceAddress.isEmpty()) return;
+    _batteryHistory->clearHistory(_deviceAddress);
+    _batteryHistoryLoaded = true;
+    _recomputeBatteryHistory();
+}
+
+bool DeviceCenterController::exportBatteryHistory(const QUrl& path) {
+    if (_deviceAddress.isEmpty() || !path.isLocalFile()) return false;
+    return _batteryHistory->exportCsv(_deviceAddress, path.toLocalFile());
+}
+
+bool DeviceCenterController::exportBatteryHistoryWithDialog() {
+    if (_deviceAddress.isEmpty()) return false;
+    const QString model = _deviceName.isEmpty() ? QStringLiteral("device") : _deviceName;
+    QString safeModel = model;
+    safeModel.replace(QRegularExpression("[^A-Za-z0-9_-]+"), "-");
+    const QString fileName = QStringLiteral("battery-history-%1-%2.csv").arg(safeModel, QDate::currentDate().toString(Qt::ISODate));
+    const QString initial = QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)).filePath(fileName);
+    const QString path = QFileDialog::getSaveFileName(nullptr, I18nManager::instance().translate("battery_export_title", _currentLanguage), initial,
+                                                       I18nManager::instance().translate("battery_csv_files", _currentLanguage));
+    return !path.isEmpty() && _batteryHistory->exportCsv(_deviceAddress, path);
+}
 int DeviceCenterController::ambientLevel() const { return _ambientLevel; }
 bool DeviceCenterController::focusOnVoice() const { return _focusOnVoice; }
 int DeviceCenterController::equalizerPreset() const { return _equalizerPreset; }

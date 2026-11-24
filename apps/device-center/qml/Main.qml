@@ -58,6 +58,82 @@ ApplicationWindow {
         return controller.t(key)
     }
 
+    Popup {
+        id: batteryHistoryPopup
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape
+        width: Math.min(720, window.width - 32)
+        height: Math.min(560, window.height - 32)
+        x: Math.round((window.width - width) / 2)
+        y: Math.round((window.height - height) / 2)
+        // Padding, not anchors: Popup sizes contentItem itself, and anchors on
+        // it left the rows at their implicit width.
+        padding: 20
+        background: Rectangle { color: window.surface; radius: 18; border.color: window.line }
+        contentItem: ColumnLayout {
+            spacing: 12
+            RowLayout {
+                Layout.fillWidth: true
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 2
+                    Text { text: controller.batteryHealth >= 0 ? window.tr("battery_health").arg(Math.round(controller.batteryHealth * 100)) : window.tr("battery_health_insufficient"); color: window.txt; font.pixelSize: 17; font.weight: Font.DemiBold }
+                    Text {
+                        text: controller.estimatedFullMinutes >= 0
+                            ? window.tr("battery_full_charge").arg(window.formatBatteryDuration(controller.estimatedFullMinutes)).arg(controller.estimateSource === "measured" ? window.tr("battery_source_measured").arg(controller.estimateSampleDays) : window.tr("battery_source_spec"))
+                            : window.tr("battery_estimate_unknown")
+                        color: window.txtDim; font.pixelSize: 12
+                    }
+                }
+                Item { Layout.fillWidth: true }
+                PillButton { compact: true; text: "×"; Accessible.name: window.tr("dismiss"); onClicked: batteryHistoryPopup.close() }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Segmented {
+                    Layout.preferredWidth: 240
+                    model: [
+                        { key: "30", label: window.tr("battery_range_30"), glyph: "", tint: window.accent },
+                        { key: "90", label: window.tr("battery_range_90"), glyph: "", tint: window.accent },
+                        { key: "all", label: window.tr("battery_range_all"), glyph: "", tint: window.accent }
+                    ]
+                    current: historyChart.rangeDays >= 99999 ? "all" : String(historyChart.rangeDays)
+                    onPicked: function(key) { historyChart.rangeDays = key === "all" ? 99999 : Number(key) }
+                }
+                Item { Layout.fillWidth: true }
+            }
+            BatteryHistoryChart {
+                id: historyChart
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                deviceController: controller
+                rangeDays: 90
+                accent: window.accent; accentFg: window.accentFg; txt: window.txt; txtDim: window.txtDim; txtFaint: window.txtFaint
+                line: window.line; surface: window.surface; surfaceSunk: window.surfaceSunk; success: window.success
+                tr: function(key) { return window.tr(key) }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Text { Layout.fillWidth: true; text: window.tr("battery_history_help"); color: window.txtFaint; font.pixelSize: 10; wrapMode: Text.Wrap; elide: Text.ElideRight }
+                Text { id: historyResult; visible: text.length > 0; color: window.txtDim; font.pixelSize: 10; elide: Text.ElideRight }
+                PillButton { compact: true; text: window.tr("battery_export"); onClicked: historyResult.text = controller.exportBatteryHistoryWithDialog() ? window.tr("battery_export_ok") : window.tr("battery_export_cancel") }
+                PillButton {
+                    compact: true
+                    tint: confirming ? window.danger : window.accent
+                    active: confirming
+                    property bool confirming: false
+                    text: confirming ? window.tr("battery_clear_confirm") : window.tr("battery_clear")
+                    onClicked: {
+                        if (!confirming) confirming = true
+                        else { controller.clearBatteryHistory(); confirming = false; historyResult.text = window.tr("battery_clear_done") }
+                    }
+                    id: historyClear
+                }
+            }
+        }
+    }
+
     // ==========================================================
     // DESIGN TOKENS
     // Every color in this file comes from here. No orphan hex.
@@ -148,6 +224,11 @@ ApplicationWindow {
     function withAlpha(c, a) {
         var k = Qt.lighter(c, 1.0)
         return Qt.rgba(k.r, k.g, k.b, a)
+    }
+    function formatBatteryDuration(minutes) {
+        var h = Math.floor(minutes / 60), m = minutes % 60
+        return m === 0 ? window.tr("duration_hours").arg(h)
+                       : window.tr("duration_hours_minutes").arg(h).arg(m)
     }
 
     // Toggles, so a second click on the badge closes the list again.
@@ -1914,6 +1995,43 @@ ApplicationWindow {
                                             font.weight: Font.Bold
                                             font.features: { "tnum": 1 }
                                         }
+                                    }
+                                }
+                                Item {
+                                    Layout.fillWidth: true
+                                    implicitHeight: estimateLines.implicitHeight
+                                    visible: controller.connected && (controller.estimatedFullMinutes >= 0 || controller.estimateSource === "spec")
+                                    Column {
+                                        id: estimateLines
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        spacing: 3
+                                        Text {
+                                            textFormat: Text.PlainText
+                                            visible: !controller.isCharging && controller.estimatedRemainingMinutes >= 0
+                                            text: window.tr("battery_remaining_to_10").arg(window.formatBatteryDuration(controller.estimatedRemainingMinutes))
+                                            color: window.txtDim; font.pixelSize: 12; elide: Text.ElideRight
+                                        }
+                                        Text {
+                                            textFormat: Text.PlainText
+                                            text: window.tr("battery_full_charge").arg(window.formatBatteryDuration(controller.estimatedFullMinutes)).arg(
+                                                controller.estimateSource === "measured"
+                                                    ? window.tr("battery_source_measured").arg(controller.estimateSampleDays)
+                                                    : window.tr("battery_source_spec"))
+                                            color: window.txtDim; font.pixelSize: 12; elide: Text.ElideRight
+                                        }
+                                    }
+                                    Text {
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        text: window.tr("battery_history_link")
+                                        color: window.accentInk
+                                        font.pixelSize: 11
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.ArrowCursor
+                                        onClicked: batteryHistoryPopup.open()
                                     }
                                 }
                             }
