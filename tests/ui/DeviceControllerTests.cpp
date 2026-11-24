@@ -99,6 +99,56 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(controller.isCharging(), 1000);
         QCOMPARE(controller.estimatedRemainingMinutes(), -1);
     }
+    void powerOffRequestsAreCoalesced() {
+        auto transport = std::make_shared<ReplyTransport>();
+        auto service = std::make_shared<core::DeviceService>(transport);
+        service->connect(transport::DeviceAddress("11:22:33:44:55:66"), "WH-1000XM5");
+        DeviceCenterController controller(nullptr, service);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 2000);
+        transport->clearSent();
+        controller.powerOffHeadphones();
+        controller.powerOffHeadphones();
+        controller.powerOffHeadphones();
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 2000);
+        int powerOffFrames = 0;
+        for (const auto& bytes : transport->sentFrames()) {
+            const auto payload = protocol::FrameCodec::decode(bytes).payload;
+            if (payload == std::vector<uint8_t>{0x24, 0x03, 0x01}) ++powerOffFrames;
+        }
+        QCOMPARE(powerOffFrames, 1);
+    }
+    void powerOffPendingClearsWhenTransportDisconnects() {
+        auto transport = std::make_shared<ReplyTransport>();
+        auto service = std::make_shared<core::DeviceService>(transport);
+        service->connect(transport::DeviceAddress("11:22:33:44:55:66"), "WH-1000XM5");
+        DeviceCenterController controller(nullptr, service);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 2000);
+        controller.powerOffHeadphones();
+        QVERIFY(controller.poweringOff());
+        QCOMPARE(controller.property("poweringOff"), QVariant(true));
+        service->disconnect();
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.isConnected(), 2500);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.poweringOff(), 500);
+    }
+    void powerOffWaitsForInflightCommand() {
+        auto transport = std::make_shared<ReplyTransport>();
+        auto service = std::make_shared<core::DeviceService>(transport);
+        service->connect(transport::DeviceAddress("11:22:33:44:55:66"), "WH-1000XM5");
+        DeviceCenterController controller(nullptr, service);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 2000);
+        transport->clearSent();
+        controller.setAmbient(12);
+        QVERIFY(controller.busy());
+        controller.powerOffHeadphones();
+        QVERIFY(controller.poweringOff());
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 2000);
+        int powerOffFrames = 0;
+        for (const auto& bytes : transport->sentFrames()) {
+            const auto payload = protocol::FrameCodec::decode(bytes).payload;
+            if (payload == std::vector<uint8_t>{0x24, 0x03, 0x01}) ++powerOffFrames;
+        }
+        QCOMPARE(powerOffFrames, 1);
+    }
     void equalizerCapabilities_data() {
         QTest::addColumn<QString>("model");
         QTest::addColumn<bool>("tenBand");

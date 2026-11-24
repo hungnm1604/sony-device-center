@@ -51,6 +51,16 @@ DeviceCenterController::DeviceCenterController(QObject* parent, std::shared_ptr<
     _currentLanguage = settings.value("language", "en").toString();
     _theme = normalizedTheme(settings.value("theme", "midnight").toString());
     _speakToChatTimeout = std::clamp(settings.value("speakToChatTimeout", 1).toInt(), 0, 3);
+    _powerOffTimer.setSingleShot(true);
+    _powerOffTimer.setInterval(12000);
+    connect(&_powerOffTimer, &QTimer::timeout, this, [this] {
+        if (!_poweringOff || !_connected) return;
+        _pendingPowerOff = false;
+        _poweringOff = false;
+        _lastError = t("power_off_no_response");
+        emit poweringOffChanged();
+        emit stateChanged();
+    });
     _applyColorScheme();
     _backend = new DeviceBackend(std::move(service));
     _backend->moveToThread(&_worker);
@@ -64,10 +74,23 @@ DeviceCenterController::DeviceCenterController(QObject* parent, std::shared_ptr<
         emit pairedDevicesChanged();
     });
     connect(_backend, &DeviceBackend::error, this, [this](const QString& error, quint64 generation) {
-        if (generation == _generation) { _lastError = error; emit stateChanged(); }
+        if (generation != _generation) return;
+        _lastError = error;
+        if (_activeMethod == QLatin1String("powerOff")) {
+            _pendingPowerOff = false;
+            _powerOffTimer.stop();
+            if (_poweringOff) { _poweringOff = false; emit poweringOffChanged(); }
+        }
+        emit stateChanged();
     });
     connect(_backend, &DeviceBackend::completed, this, [this](quint64 generation) {
-        if (generation == _generation) { _busy = false; emit stateChanged(); }
+        if (generation != _generation) return;
+        _busy = false;
+        emit stateChanged();
+        if (_pendingPowerOff && _poweringOff && _connected) {
+            _pendingPowerOff = false;
+            _send("powerOff");
+        }
     });
     _worker.start();
 }
@@ -85,6 +108,7 @@ void DeviceCenterController::_send(const QString& method, const QJsonObject& par
     if (_busy && method != "disconnect") return;
     if (method == "disconnect") _backend->cancelPending();
     _busy = true; _lastError.clear(); const auto generation = ++_generation;
+    _activeMethod = method;
     emit stateChanged();
     const auto bytes = QJsonDocument(QJsonObject{{"method",method},{"params",params}}).toJson(QJsonDocument::Compact);
     QMetaObject::invokeMethod(_backend, [backend = _backend, bytes, generation] { backend->command(bytes, generation); }, Qt::QueuedConnection);
@@ -101,6 +125,12 @@ void DeviceCenterController::_applySnapshot(const QByteArray& data) {
     _connectionState = s.value("connectionState").toString("disconnected");
     if (s.contains("name")) _deviceName = s.value("name").toString();
     if (s.contains("address")) _deviceAddress = s.value("address").toString();
+    if (_poweringOff && (!s.value("connected").toBool() || oldAddress != _deviceAddress)) {
+        _powerOffTimer.stop();
+        _pendingPowerOff = false;
+        _poweringOff = false;
+        emit poweringOffChanged();
+    }
     if (!_deviceAddress.isEmpty() && _deviceAddress != _batteryHistoryAddress) {
         _batteryHistoryAddress = _deviceAddress;
         _batteryHistoryLoaded = false;
@@ -295,7 +325,12 @@ void DeviceCenterController::setSpeakToChat(bool enabled) {
     _send("speakToChat", params);
 }
 void DeviceCenterController::powerOffHeadphones() {
-    if (_connected && hasPowerOff()) _send("powerOff");
+    if (_poweringOff || !_connected || !hasPowerOff()) return;
+    _poweringOff = true;
+    emit poweringOffChanged();
+    _powerOffTimer.start();
+    if (_busy) _pendingPowerOff = true;
+    else _send("powerOff");
 }
 void DeviceCenterController::setSpeakToChatTimeout(int timeout) {
     timeout = std::clamp(timeout, 0, 3);

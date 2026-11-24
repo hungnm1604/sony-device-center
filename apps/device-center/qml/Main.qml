@@ -1042,7 +1042,8 @@ ApplicationWindow {
                 color: offHover.hovered || activeFocus ? window.surfaceHi : "transparent"
                 activeFocusOnTab: true
                 Accessible.role: Accessible.MenuItem
-                Accessible.name: window.tr("power_off_named").arg(controller.deviceName)
+                Accessible.name: controller.poweringOff ? window.tr("power_off_pending") : window.tr("power_off_named").arg(controller.deviceName)
+                enabled: !controller.poweringOff
                 function run() { picker.close(); controller.powerOffHeadphones() }
                 Keys.onReturnPressed: run()
                 HoverHandler { id: offHover }
@@ -1055,7 +1056,7 @@ ApplicationWindow {
                     Text {
                         textFormat: Text.PlainText
                         Layout.fillWidth: true
-                        text: window.tr("power_off_named").arg(controller.deviceName)
+                        text: controller.poweringOff ? window.tr("power_off_pending") : window.tr("power_off_named").arg(controller.deviceName)
                         color: window.danger
                         font.pixelSize: 12
                         elide: Text.ElideRight
@@ -1914,8 +1915,9 @@ ApplicationWindow {
                                 anchors.margins: 12
                                 compact: true
                                 glyphPath: window.icons.power
-                                text: window.tr("turn_off")
-                                Accessible.name: window.tr("power_off_named").arg(controller.deviceName)
+                                enabled: !controller.poweringOff
+                                text: controller.poweringOff ? window.tr("power_off_pending") : window.tr("turn_off")
+                                Accessible.name: controller.poweringOff ? window.tr("power_off_pending") : window.tr("power_off_named").arg(controller.deviceName)
                                 ToolTip.visible: hovered
                                 ToolTip.delay: 600
                                 ToolTip.text: window.tr("power_off_named").arg(controller.deviceName)

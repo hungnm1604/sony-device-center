@@ -168,6 +168,7 @@ DesktopIntegration::DesktopIntegration(DeviceCenterController* controller, QObje
 
     connect(controller, &DeviceCenterController::stateChanged, this, [this] { _refreshTray(); _checkBattery(); });
     connect(controller, &DeviceCenterController::capabilitiesChanged, this, &DesktopIntegration::_refreshTray);
+    connect(controller, &DeviceCenterController::poweringOffChanged, this, &DesktopIntegration::_refreshTray);
     connect(controller, &DeviceCenterController::languageChanged, this, &DesktopIntegration::_refreshTray);
     connect(controller, &DeviceCenterController::pairedDevicesChanged, this, &DesktopIntegration::_refreshDevices);
     _refreshTray();
@@ -330,9 +331,9 @@ void DesktopIntegration::_refreshTray() {
     _ambient->setText(c->t("ambient_sound"));
     _off->setText(c->t("noise_control_off"));
     _open->setText(c->t("tray_open"));
-    _powerOff->setText(c->t("power_off_named").arg(c->deviceName()));
+    _powerOff->setText(c->poweringOff() ? c->t("power_off_pending") : c->t("power_off_named").arg(c->deviceName()));
     _powerOff->setVisible(connected && c->hasPowerOff());
-    _powerOff->setEnabled(!c->busy());
+    _powerOff->setEnabled(!c->poweringOff());
     _refreshDevices();
     _quit->setText(c->t("tray_quit"));
 

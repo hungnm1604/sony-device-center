@@ -177,6 +177,8 @@ void I18nManager::_initTranslations() {
     en["apo_taken_off"]       = "When Taken Off";
     en["apo_unreadable"]      = "Couldn't read this setting from the headphones.";
     en["power_off_named"]     = "Turn Off %1";
+    en["power_off_pending"]   = "Turning off…";
+    en["power_off_no_response"] = "The headphones did not turn off. Try again.";
     en["menubar_percent"]     = "Show Battery Percentage";
     en["menubar_percent_desc"] = "Shown inside the menu bar headphone icon.";
     en["connected_to_mac"]    = "Connected to this Mac";

@@ -6,6 +6,7 @@
 #include <QString>
 #include <QVariantList>
 #include <QUrl>
+#include <QTimer>
 #include <memory>
 #include <string>
 
@@ -21,6 +22,7 @@ class DeviceCenterController : public QObject {
     Q_OBJECT
 
     Q_PROPERTY(bool busy READ busy NOTIFY stateChanged)
+    Q_PROPERTY(bool poweringOff READ poweringOff NOTIFY poweringOffChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY stateChanged)
     Q_PROPERTY(QString connectionState READ connectionState NOTIFY stateChanged)
     Q_PROPERTY(QString codec READ codec NOTIFY stateChanged)
@@ -89,6 +91,7 @@ public:
     ~DeviceCenterController() override;
 
     bool busy() const { return _busy; }
+    bool poweringOff() const { return _poweringOff; }
     QString lastError() const { return _lastError; }
     QString connectionState() const { return _connectionState; }
     QString codec() const { return _codec; }
@@ -180,6 +183,7 @@ signals:
     void themeChanged();
     void speakToChatTimeoutChanged();
     void batteryHistoryChanged();
+    void poweringOffChanged();
 
 private:
     void _applySnapshot(const QByteArray& data);
@@ -192,6 +196,10 @@ private:
     DeviceBackend* _backend{nullptr};
     quint64 _generation{0};
     bool _busy{true};
+    bool _poweringOff{false};
+    bool _pendingPowerOff{false};
+    QString _activeMethod;
+    QTimer _powerOffTimer;
     QString _lastError, _connectionState{"searching"}, _codec{"Unknown"};
     QVariantMap _features;
     QJsonObject _capabilities;
